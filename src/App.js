@@ -161,45 +161,48 @@ const App = () => {
   const isNameEntered = nameInput.trim().length > 0;
   
   const MainContent = () => (
-    <div className="w-full max-w-lg p-6 bg-white rounded-xl shadow-lg box-shadow-custom">
+    // CHANGE 1: 박스 배경색을 남색으로, 기본 글자색을 흰색으로 변경
+    <div className="w-full max-w-lg p-6 bg-slate-800 text-white rounded-xl shadow-lg box-shadow-custom">
       {isAdmin ? (
         <>
-          <h1 className="text-3xl font-bold text-center mb-4 text-orange-700">Admin Dashboard</h1>
-          <button onClick={() => setIsAdmin(false)} className="mb-4 p-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Back to student view</button>
+          <h1 className="text-3xl font-bold text-center mb-4 text-orange-500">Admin Dashboard</h1>
+          {/* 어두운 배경에 맞게 버튼 스타일 수정 */}
+          <button onClick={() => setIsAdmin(false)} className="mb-4 p-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700">Back to student view</button>
           <div className="flex justify-center items-center space-x-2 mb-6">
-            <label className="text-gray-600 text-lg">Select Class Date:</label>
-            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="p-3 border border-gray-300 rounded-lg text-lg"/>
+            <label className="text-gray-300 text-lg">Select Class Date:</label>
+            {/* 날짜 입력 필드 스타일 수정 */}
+            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-lg"/>
           </div>
           <div className="flex flex-wrap justify-center gap-2 mb-6">
-            {COURSES.map((course) => <button key={course} onClick={() => setSelectedCourse(course)} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-800'}`}>{course}</button>)}
+            {COURSES.map((course) => <button key={course} onClick={() => setSelectedCourse(course)} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)}
           </div>
-          <h2 className="text-2xl font-semibold mb-4 text-center text-gray-700">{selectedDate} - {selectedCourse} Data</h2>
-          <div className="text-left p-4 border rounded-xl mt-6">
-            <h3 className="text-xl font-semibold">📊 Understanding Log</h3>
-            <ul>{feedbackLog.map((log, i) => <li key={i} className="p-2 border-b">{log.name} ({log.timestamp?.toDate().toLocaleTimeString()}): {log.status}</li>)}</ul>
+          <h2 className="text-2xl font-semibold mb-4 text-center text-gray-200">{selectedDate} - {selectedCourse} Data</h2>
+          <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
+            <h3 className="text-xl font-semibold text-gray-100">📊 Understanding Log</h3>
+            <ul>{feedbackLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">{log.name} ({log.timestamp?.toDate().toLocaleTimeString()}): {log.status}</li>)}</ul>
           </div>
-          <div className="text-left p-4 border rounded-xl mt-6">
-            <h3 className="text-xl font-semibold">❓ Questions/Comments Log</h3>
-            <ul>{questionsLog.map((log, i) => <li key={i} className="p-2 border-b">{log.name} [{log.type}]: {log.text}</li>)}</ul>
+          <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
+            <h3 className="text-xl font-semibold text-gray-100">❓ Questions/Comments Log</h3>
+            <ul>{questionsLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">{log.name} [{log.type}]: {log.text}</li>)}</ul>
           </div>
         </>
       ) : (
         <>
-          <h1 className="text-3xl font-bold text-center mb-1">Ahnstoppable Learning:<br /><span className="text-orange-700">Freely Ask, Freely Learn</span></h1>
+          <h1 className="text-3xl font-bold text-center mb-1">Ahnstoppable Learning:<br /><span className="text-orange-500">Freely Ask, Freely Learn</span></h1>
           <div className="flex justify-center space-x-2 my-2 text-3xl"><span>😁</span><span>😀</span><span>😁</span></div>
           <div className="flex flex-wrap justify-center gap-2 mb-6 mt-4">
-            {COURSES.map((course) => <button key={course} onClick={() => { setSelectedCourse(course); setNameInput(''); }} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-800'}`}>{course}</button>)}
+            {COURSES.map((course) => <button key={course} onClick={() => { setSelectedCourse(course); setNameInput(''); }} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)}
           </div>
-          <h2 className="text-2xl font-semibold mb-4 text-center text-gray-700">{selectedCourse}</h2>
+          <h2 className="text-2xl font-semibold mb-4 text-center text-gray-200">{selectedCourse}</h2>
           <div className="mb-6">
-            <select value={nameInput} onChange={(e) => setNameInput(e.target.value)} disabled={!isFirebaseConnected} className="p-3 w-full border rounded-lg text-lg">
+            <select value={nameInput} onChange={(e) => setNameInput(e.target.value)} disabled={!isFirebaseConnected} className="p-3 w-full border bg-slate-700 border-slate-500 rounded-lg text-lg">
               <option value="">Select your name...</option>
               {COURSE_STUDENTS[selectedCourse].map((name, i) => <option key={i} value={name}>{name}</option>)}
             </select>
-            <p className="text-center text-sm text-gray-500 mt-2">{isNameEntered && isFirebaseConnected ? <span className="text-orange-600 font-bold">Hello, {getFirstName(nameInput)}!</span> : <span>Select your name to enable features.</span>}{!isFirebaseConnected && <span className="block text-red-500 font-bold mt-2">🚫 DB connection failed.</span>}</p>
+            <p className="text-center text-sm text-gray-400 mt-2">{isNameEntered && isFirebaseConnected ? <span className="text-orange-500 font-bold">Hello, {getFirstName(nameInput)}!</span> : <span>Select your name to enable features.</span>}{!isFirebaseConnected && <span className="block text-red-500 font-bold mt-2">🚫 DB connection failed.</span>}</p>
           </div>
           <div className={`text-center mb-8 ${!isNameEntered || !isFirebaseConnected ? 'opacity-50' : ''}`}>
-            <p className="text-xl font-medium">Understanding Check</p>
+            <p className="text-xl font-medium text-gray-200">Understanding Check</p>
             <div className="flex justify-center space-x-4 mt-2">
               <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Not Understood 🙁')} disabled={!isNameEntered || !isFirebaseConnected} className={`p-4 w-12 h-12 rounded-full bg-red-500 ${clickedButton === 'Not Understood 🙁' ? 'ring-4 ring-orange-500' : ''}`}></button><span className="text-sm">Not Understood</span></div>
               <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Confused 🤔')} disabled={!isNameEntered || !isFirebaseConnected} className={`p-4 w-12 h-12 rounded-full bg-yellow-400 ${clickedButton === 'Confused 🤔' ? 'ring-4 ring-orange-500' : ''}`}></button><span className="text-sm">Confused</span></div>
@@ -207,20 +210,20 @@ const App = () => {
             </div>
           </div>
           <div className={`space-y-4 mb-6 ${!isNameEntered || !isFirebaseConnected ? 'opacity-50' : ''}`}>
-            <p className="text-lg font-medium">Leave a Question or Comment</p>
-            <form onSubmit={(e) => handleAddContent(e, 'question')} className="flex space-x-2"><input type="text" value={questionInput} onChange={(e) => setQuestionInput(e.target.value)} placeholder="Enter a question" disabled={!isNameEntered || !isFirebaseConnected} className="flex-1 p-3 border rounded-lg text-lg" /><button type="submit" disabled={!isNameEntered || !isFirebaseConnected} className="p-3 bg-orange-500 text-white rounded-lg">Add</button></form>
-            <p className="text-base font-semibold mt-4">What do you think? 🤔</p>
-            <form onSubmit={(e) => handleAddContent(e, 'comment')} className="flex space-x-2"><input type="text" value={commentInput} onChange={(e) => setCommentInput(e.target.value)} placeholder="Enter your thoughts" disabled={!isNameEntered || !isFirebaseConnected} className="flex-1 p-3 border rounded-lg text-lg" /><button type="submit" disabled={!isNameEntered || !isFirebaseConnected} className="p-3 bg-orange-500 text-white rounded-lg">Add</button></form>
+            <p className="text-lg font-medium text-gray-200">Leave a Question or Comment</p>
+            <form onSubmit={(e) => handleAddContent(e, 'question')} className="flex space-x-2"><input type="text" value={questionInput} onChange={(e) => setQuestionInput(e.target.value)} placeholder="Enter a question" disabled={!isNameEntered || !isFirebaseConnected} className="flex-1 p-3 border bg-slate-700 border-slate-500 rounded-lg text-lg" /><button type="submit" disabled={!isNameEntered || !isFirebaseConnected} className="p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg">Add</button></form>
+            <p className="text-base font-semibold mt-4 text-gray-200">What do you think? 🤔</p>
+            <form onSubmit={(e) => handleAddContent(e, 'comment')} className="flex space-x-2"><input type="text" value={commentInput} onChange={(e) => setCommentInput(e.target.value)} placeholder="Enter your thoughts" disabled={!isNameEntered || !isFirebaseConnected} className="flex-1 p-3 border bg-slate-700 border-slate-500 rounded-lg text-lg" /><button type="submit" disabled={!isNameEntered || !isFirebaseConnected} className="p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg">Add</button></form>
           </div>
-          <div className={`text-left p-4 border rounded-xl mt-6 ${!isNameEntered || !isFirebaseConnected ? 'opacity-50' : ''}`}>
-            <h3 className="text-xl font-semibold">📊 My Understanding Log</h3>
-            <ul>{feedbackLog.map((log, i) => <li key={i} className="p-2 border-b">({log.timestamp?.toDate().toLocaleTimeString()}): {log.status}</li>)}</ul>
-            <h3 className="text-xl font-semibold pt-4">❓ My Questions/Comments Log</h3>
-            <ul>{questionsLog.map((log, i) => <li key={i} className="p-2 border-b">[{log.type}]: {log.text}</li>)}</ul>
+          <div className={`text-left p-4 border border-slate-600 rounded-xl mt-6 ${!isNameEntered || !isFirebaseConnected ? 'opacity-50' : ''}`}>
+            <h3 className="text-xl font-semibold text-gray-100">📊 My Understanding Log</h3>
+            <ul>{feedbackLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">({log.timestamp?.toDate().toLocaleTimeString()}): {log.status}</li>)}</ul>
+            <h3 className="text-xl font-semibold pt-4 text-gray-100">❓ My Questions/Comments Log</h3>
+            <ul>{questionsLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">[{log.type}]: {log.text}</li>)}</ul>
           </div>
-          <div className="flex flex-col items-center mt-8 p-4 border-t">
-            <p className="text-md font-medium mb-2">Admin Login</p>
-            <div className="flex space-x-2"><input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} placeholder="Password" className="p-2 border rounded-lg text-sm" /><button onClick={handleAdminLogin} className="p-2 bg-orange-500 text-white rounded-lg">Login</button></div>
+          <div className="flex flex-col items-center mt-8 p-4 border-t border-slate-600">
+            <p className="text-md font-medium text-gray-200 mb-2">Admin Login</p>
+            <div className="flex space-x-2"><input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} placeholder="Password" className="p-2 border bg-slate-700 border-slate-500 rounded-lg text-sm" /><button onClick={handleAdminLogin} className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg">Login</button></div>
           </div>
         </>
       )}
@@ -229,7 +232,6 @@ const App = () => {
 
   return (
     <div className="relative min-h-screen w-full bg-blue-100 flex items-center justify-center p-4 overflow-hidden">
-      {/* --- START: Scrapbook Background --- */}
       <div className="absolute inset-0 w-full h-full overflow-hidden">
         {/* Photos */}
         <img src="/photo1.jpg" alt="Collage 1" className="absolute top-[5%] left-[5%] w-40 md:w-48 rounded-lg shadow-lg transform -rotate-6 z-10" />
@@ -247,16 +249,15 @@ const App = () => {
         <img src="/photo13.jpg" alt="Collage 13" className="absolute top-[75%] right-[30%] w-44 md:w-56 rounded-lg shadow-lg transform -rotate-4 z-10" />
         <img src="/photo14.jpg" alt="Collage 14" className="absolute top-[40%] left-[1%] w-36 md:w-48 rounded-lg shadow-lg transform -rotate-12 z-10" />
         
-        {/* --- NEW: Text quotes inside styled boxes --- */}
-        <div className="absolute top-[25%] right-[28%] w-64 p-4 z-10 transform -rotate-2 bg-white rounded-lg shadow-lg">
-            <p className="font-serif text-lg text-gray-800 text-center">"Learning is not about memorizing facts, but learning to ask the right questions."</p>
+        {/* CHANGE 2 & 3: 명언 위치/크기/폰트 수정 */}
+        <div className="absolute top-[25%] right-[28%] w-56 p-4 z-10 transform -rotate-2 bg-white rounded-lg shadow-lg">
+            <p className="font-sans text-base text-gray-800 text-center">"Learning is not about memorizing facts, but learning to ask the right questions."</p>
         </div>
-        <div className="absolute bottom-[20%] left-[25%] w-72 p-4 z-10 transform rotate-3 bg-yellow-50 rounded-lg shadow-lg">
-            <p className="font-serif text-xl text-gray-700 font-semibold text-center">"He who asks a question is a fool for five minutes; he who does not ask remains a fool forever."</p>
-            <p className="text-right text-gray-600 italic mt-2">- Talmudic proverb</p>
+        <div className="absolute bottom-[20%] left-[25%] w-64 p-4 z-10 transform rotate-3 bg-yellow-50 rounded-lg shadow-lg">
+            <p className="font-sans text-lg text-gray-700 font-semibold text-center">"He who asks a question is a fool for five minutes; he who does not ask remains a fool forever."</p>
+            <p className="text-right text-gray-600 italic mt-2 text-sm">- Talmudic proverb</p>
         </div>
       </div>
-      {/* --- END: Scrapbook Background --- */}
       
       <div className="relative z-20">
         <MainContent />
