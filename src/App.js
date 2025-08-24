@@ -104,14 +104,18 @@ const App = () => {
   const [questionInput, setQuestionInput] = useState('');
   const [commentInput, setCommentInput] = useState('');
   const [selectedCourse, setSelectedCourse] = useState(COURSES[0]);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+
+  // *** ADMIN VIEW CHANGE 1: Load date from localStorage, or default to today ***
+  // Admin이 선택한 날짜를 브라우저에 저장하여 새로고침해도 유지되도록 합니다.
+  const [selectedDate, setSelectedDate] = useState(
+    () => localStorage.getItem('adminSelectedDate') || new Date().toISOString().slice(0, 10)
+  );
+
   const [feedbackLog, setFeedbackLog] = useState([]);
   const [questionsLog, setQuestionsLog] = useState([]);
   const [message, setMessage] = useState('');
   const [showMessageBox, setShowMessageBox] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-
-  // 3번 요청 수정: 버튼 클릭 피드백을 위한 state 추가
   const [clickedButton, setClickedButton] = useState(null);
 
   // State variables for admin page.
@@ -136,6 +140,14 @@ const App = () => {
     const parts = fullName.split(', ');
     return parts.length > 1 ? parts[1] : parts[0];
   };
+
+  // *** ADMIN VIEW CHANGE 2: Save date to localStorage whenever it changes ***
+  // Admin이 날짜 선택기를 바꿀 때마다 그 값을 브라우저에 저장합니다.
+  useEffect(() => {
+    if (isAdmin) {
+      localStorage.setItem('adminSelectedDate', selectedDate);
+    }
+  }, [selectedDate, isAdmin]);
 
   // Firebase initialization and authentication.
   useEffect(() => {
@@ -176,9 +188,10 @@ const App = () => {
 
     initializeFirebase();
 
-  }, [token, showMessage, firebaseConfig]);
+  }, [token, firebaseConfig]);
 
   // Real-time listeners for feedback and questions (For Admin View).
+  // This now uses the persistent 'selectedDate' state.
   useEffect(() => {
     if (!isFirebaseConnected || !db || !isAdmin) {
       return;
@@ -186,8 +199,6 @@ const App = () => {
 
     const publicDataPath = `/artifacts/${appId}/public/data`;
 
-    // Firestore queries. Note: `orderBy` is removed to avoid index issues.
-    // The data will be sorted locally in the component.
     const feedbackQuery = query(
       collection(db, `${publicDataPath}/feedback`),
       where("course", "==", selectedCourse),
@@ -199,39 +210,36 @@ const App = () => {
       where("date", "==", selectedDate)
     );
 
-    // Real-time listener for feedback.
     const unsubscribeFeedback = onSnapshot(feedbackQuery, (querySnapshot) => {
       const data = [];
       querySnapshot.forEach((doc) => {
         data.push(doc.data());
       });
-      // Sort data locally by timestamp in descending order
       setFeedbackLog(data.sort((a, b) => b.timestamp - a.timestamp));
     }, (error) => {
         console.error("Feedback listener failed:", error);
     });
 
-    // Real-time listener for questions.
     const unsubscribeQuestions = onSnapshot(questionsQuery, (querySnapshot) => {
       const data = [];
       querySnapshot.forEach((doc) => {
         data.push(doc.data());
       });
-      // Sort data locally by timestamp in descending order
       setQuestionsLog(data.sort((a, b) => b.timestamp - a.timestamp));
     }, (error) => {
         console.error("Questions listener failed:", error);
     });
 
-    // Clean up listeners on component unmount or state change.
     return () => {
       unsubscribeFeedback();
       unsubscribeQuestions();
     };
   }, [isFirebaseConnected, db, selectedCourse, selectedDate, appId, isAdmin]);
 
-  // 2번 요청 수정: 학생용 누적 기록을 불러오는 리스너 추가
+  // Real-time listener for a student's cumulative log.
   useEffect(() => {
+    // *** STUDENT VIEW CLARIFICATION: This fetches all records for the student in the selected course, regardless of date. ***
+    // 이 로직은 학생이 로그인했을 때, 날짜와 상관없이 해당 과목에서 남긴 모든 기록을 불러옵니다.
     if (!isFirebaseConnected || !db || isAdmin || !nameInput) {
       setFeedbackLog([]);
       setQuestionsLog([]);
@@ -254,14 +262,12 @@ const App = () => {
     const unsubscribeFeedback = onSnapshot(feedbackQuery, (snapshot) => {
       const data = [];
       snapshot.forEach(doc => data.push(doc.data()));
-      // Sort data locally by timestamp in descending order
       setFeedbackLog(data.sort((a, b) => b.timestamp - a.timestamp));
     });
 
     const unsubscribeQuestions = onSnapshot(questionsQuery, (snapshot) => {
       const data = [];
       snapshot.forEach(doc => data.push(doc.data()));
-      // Sort data locally by timestamp in descending order
       setQuestionsLog(data.sort((a, b) => b.timestamp - a.timestamp));
     });
 
@@ -283,8 +289,7 @@ const App = () => {
       showMessage("There is a database connection issue. Please try again in a moment. ⏳");
       return;
     }
-
-    // 3번 요청 수정: 클릭 피드백 로직 추가
+    
     setClickedButton(status);
     setTimeout(() => setClickedButton(null), 1500);
 
@@ -294,7 +299,7 @@ const App = () => {
         name: nameInput,
         status,
         course: selectedCourse,
-        date: new Date().toISOString().slice(0, 10), // 항상 현재 날짜로 기록
+        date: new Date().toISOString().slice(0, 10), // Always record with the current date
         timestamp: serverTimestamp()
       });
       showMessage("Feedback submitted successfully! ✅");
@@ -324,7 +329,7 @@ const App = () => {
         text,
         type,
         course: selectedCourse,
-        date: new Date().toISOString().slice(0, 10), // 항상 현재 날짜로 기록
+        date: new Date().toISOString().slice(0, 10), // Always record with the current date
         timestamp: serverTimestamp()
       });
       showMessage("Submission complete! ✅");
@@ -405,7 +410,6 @@ const App = () => {
             <ul className="list-none p-0 space-y-2">
               {feedbackLog.map((log, index) => (
                 <li key={index} className="p-2 border-b border-gray-200 text-base text-gray-700">
-                  {/* 1번 요청 수정: 시간 표시 형식 개선 */}
                   {log.name} ({log.timestamp ? `${log.timestamp.toDate().toLocaleDateString()} ${log.timestamp.toDate().toLocaleTimeString()}` : 'No date/time'}): {log.status}
                 </li>
               ))}
@@ -416,7 +420,6 @@ const App = () => {
             <ul className="list-none p-0 space-y-2">
               {questionsLog.map((log, index) => (
                 <li key={index} className="p-2 border-b border-gray-200 text-base text-gray-700">
-                  {/* 1번 요청 수정: 시간 표시 형식 개선 */}
                   {log.name} [{log.type === 'question' ? 'Question' : 'Comment'}] ({log.timestamp ? `${log.timestamp.toDate().toLocaleDateString()} ${log.timestamp.toDate().toLocaleTimeString()}` : 'No date/time'}): {log.text}
               </li>
             ))}
@@ -500,7 +503,6 @@ const App = () => {
               <button
                 onClick={() => handleFeedback('Not Understood 🙁')}
                 disabled={!isNameEntered || !isFirebaseConnected}
-                // 3번 요청 수정: 클릭 시 시각적 피드백 클래스 추가
                 className={`p-4 w-12 h-12 rounded-full bg-red-500 text-white text-base font-semibold transition duration-150 transform hover:scale-105 active:scale-95 shadow-md mb-2 disabled:opacity-50 disabled:cursor-not-allowed ${clickedButton === 'Not Understood 🙁' ? 'ring-4 ring-purple-500' : ''}`}
               ></button>
               <span className="text-sm">Not Understood</span>
@@ -509,7 +511,6 @@ const App = () => {
               <button
                 onClick={() => handleFeedback('Confused 🤔')}
                 disabled={!isNameEntered || !isFirebaseConnected}
-                // 3번 요청 수정: 클릭 시 시각적 피드백 클래스 추가
                 className={`p-4 w-12 h-12 rounded-full bg-yellow-400 text-black text-base font-semibold transition duration-150 transform hover:scale-105 active:scale-95 shadow-md mb-2 disabled:opacity-50 disabled:cursor-not-allowed ${clickedButton === 'Confused 🤔' ? 'ring-4 ring-purple-500' : ''}`}
               ></button>
               <span className="text-sm">Confused</span>
@@ -518,7 +519,6 @@ const App = () => {
               <button
                 onClick={() => handleFeedback('Got It! ✅')}
                 disabled={!isNameEntered || !isFirebaseConnected}
-                // 3번 요청 수정: 클릭 시 시각적 피드백 클래스 추가
                 className={`p-4 w-12 h-12 rounded-full bg-green-500 text-white text-base font-semibold transition duration-150 transform hover:scale-105 active:scale-95 shadow-md mb-2 disabled:opacity-50 disabled:cursor-not-allowed ${clickedButton === 'Got It! ✅' ? 'ring-4 ring-purple-500' : ''}`}
               ></button>
               <span className="text-sm">Got It!</span>
@@ -573,7 +573,6 @@ const App = () => {
           <ul className="list-none p-0 space-y-2">
              {feedbackLog.map((log, index) => (
                 <li key={index} className="p-2 border-b border-gray-200 text-base text-gray-700">
-                  {/* 2번 요청 수정: 시간 표시 형식 개선 */}
                   ({log.timestamp ? `${log.timestamp.toDate().toLocaleDateString()} ${log.timestamp.toDate().toLocaleTimeString()}` : 'No date/time'}): {log.status}
                 </li>
               ))}
@@ -582,7 +581,6 @@ const App = () => {
           <ul className="list-none p-0 space-y-2">
             {questionsLog.map((log, index) => (
                 <li key={index} className="p-2 border-b border-gray-200 text-base text-gray-700">
-                  {/* 2번 요청 수정: 시간 표시 형식 개선 */}
                   [{log.type === 'question' ? 'Question' : 'Comment'}] ({log.timestamp ? `${log.timestamp.toDate().toLocaleDateString()} ${log.timestamp.toDate().toLocaleTimeString()}` : 'No date/time'}): {log.text}
                 </li>
               ))}
