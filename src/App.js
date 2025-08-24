@@ -229,9 +229,7 @@ const App = () => {
 
   return (
     <div className="relative min-h-screen w-full bg-gray-100 flex items-center justify-center p-4 overflow-hidden">
-      {/* --- START: Scrapbook Background Photos --- */}
       <div className="absolute inset-0 w-full h-full overflow-hidden">
-        {/* --- FIX: 'photo'라는 중복 단어를 alt 속성에서 제거했습니다 --- */}
         <img src="/photo1.jpg" alt="Collage 1" className="absolute top-[5%] left-[5%] w-48 h-auto rounded-lg shadow-lg transform -rotate-6 z-0" />
         <img src="/photo2.jpg" alt="Collage 2" className="absolute top-[10%] right-[8%] w-52 h-auto rounded-lg shadow-lg transform rotate-3 z-0" />
         <img src="/photo3.jpg" alt="Collage 3" className="absolute bottom-[15%] left-[10%] w-44 h-auto rounded-lg shadow-lg transform rotate-2 z-0" />
@@ -247,13 +245,11 @@ const App = () => {
         <img src="/photo13.jpg" alt="Collage 13" className="absolute top-[80%] right-[30%] w-52 h-auto rounded-lg shadow-lg transform -rotate-4 z-0" />
         <img src="/photo14.jpg" alt="Collage 14" className="absolute top-[45%] left-[1%] w-44 h-auto rounded-lg shadow-lg transform -rotate-12 z-0" />
       </div>
-      {/* --- END: Scrapbook Background Photos --- */}
       
       <div className="relative z-10">
         <MainContent />
       </div>
       
-      {/* Message Box */}
       {showMessageBox && (
         <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-900 text-white p-6 rounded-xl text-center z-50">
           {message}
