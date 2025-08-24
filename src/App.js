@@ -161,16 +161,13 @@ const App = () => {
   const isNameEntered = nameInput.trim().length > 0;
   
   const MainContent = () => (
-    // CHANGE 1: 박스 배경색을 남색으로, 기본 글자색을 흰색으로 변경
     <div className="w-full max-w-lg p-6 bg-slate-800 text-white rounded-xl shadow-lg box-shadow-custom">
       {isAdmin ? (
         <>
           <h1 className="text-3xl font-bold text-center mb-4 text-orange-500">Admin Dashboard</h1>
-          {/* 어두운 배경에 맞게 버튼 스타일 수정 */}
           <button onClick={() => setIsAdmin(false)} className="mb-4 p-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700">Back to student view</button>
           <div className="flex justify-center items-center space-x-2 mb-6">
             <label className="text-gray-300 text-lg">Select Class Date:</label>
-            {/* 날짜 입력 필드 스타일 수정 */}
             <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-lg"/>
           </div>
           <div className="flex flex-wrap justify-center gap-2 mb-6">
@@ -249,13 +246,13 @@ const App = () => {
         <img src="/photo13.jpg" alt="Collage 13" className="absolute top-[75%] right-[30%] w-44 md:w-56 rounded-lg shadow-lg transform -rotate-4 z-10" />
         <img src="/photo14.jpg" alt="Collage 14" className="absolute top-[40%] left-[1%] w-36 md:w-48 rounded-lg shadow-lg transform -rotate-12 z-10" />
         
-        {/* CHANGE 2 & 3: 명언 위치/크기/폰트 수정 */}
-        <div className="absolute top-[25%] right-[28%] w-56 p-4 z-10 transform -rotate-2 bg-white rounded-lg shadow-lg">
-            <p className="font-sans text-base text-gray-800 text-center">"Learning is not about memorizing facts, but learning to ask the right questions."</p>
+        {/* CHANGE: 명언 위치/크기/폰트 수정 */}
+        <div className="absolute top-[28%] right-[25%] w-56 p-3 z-10 transform -rotate-2 bg-white rounded-lg shadow-lg">
+            <p className="font-sans text-sm text-gray-800 text-center">"Learning is not about memorizing facts, but learning to ask the right questions."</p>
         </div>
-        <div className="absolute bottom-[20%] left-[25%] w-64 p-4 z-10 transform rotate-3 bg-yellow-50 rounded-lg shadow-lg">
-            <p className="font-sans text-lg text-gray-700 font-semibold text-center">"He who asks a question is a fool for five minutes; he who does not ask remains a fool forever."</p>
-            <p className="text-right text-gray-600 italic mt-2 text-sm">- Talmudic proverb</p>
+        <div className="absolute bottom-[22%] left-[20%] w-60 p-3 z-10 transform rotate-3 bg-yellow-50 rounded-lg shadow-lg">
+            <p className="font-sans text-base text-gray-700 font-semibold text-center">"He who asks a question is a fool for five minutes; he who does not ask remains a fool forever."</p>
+            <p className="text-right text-gray-600 italic mt-1 text-xs">- Talmudic proverb</p>
         </div>
       </div>
       
