@@ -251,7 +251,7 @@ const App = () => {
       </div>
       
       {showMessageBox && (
-        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-900 text-white p-6 rounded-xl text-center z-50">
+        <div className="fixed top-1/2 left-1/2 -translate-x-1-2 -translate-y-1/2 bg-gray-900 text-white p-6 rounded-xl text-center z-50">
           {message}
         </div>
       )}
