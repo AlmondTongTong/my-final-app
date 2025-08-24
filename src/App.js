@@ -104,13 +104,9 @@ const App = () => {
   const [questionInput, setQuestionInput] = useState('');
   const [commentInput, setCommentInput] = useState('');
   const [selectedCourse, setSelectedCourse] = useState(COURSES[0]);
-
-  // *** ADMIN VIEW CHANGE 1: Load date from localStorage, or default to today ***
-  // Admin이 선택한 날짜를 브라우저에 저장하여 새로고침해도 유지되도록 합니다.
   const [selectedDate, setSelectedDate] = useState(
     () => localStorage.getItem('adminSelectedDate') || new Date().toISOString().slice(0, 10)
   );
-
   const [feedbackLog, setFeedbackLog] = useState([]);
   const [questionsLog, setQuestionsLog] = useState([]);
   const [message, setMessage] = useState('');
@@ -141,8 +137,6 @@ const App = () => {
     return parts.length > 1 ? parts[1] : parts[0];
   };
 
-  // *** ADMIN VIEW CHANGE 2: Save date to localStorage whenever it changes ***
-  // Admin이 날짜 선택기를 바꿀 때마다 그 값을 브라우저에 저장합니다.
   useEffect(() => {
     if (isAdmin) {
       localStorage.setItem('adminSelectedDate', selectedDate);
@@ -171,7 +165,6 @@ const App = () => {
         dbInstance = getFirestore(app);
         setDb(dbInstance);
 
-        // Sign in with custom token or anonymously.
         if (token) {
           await signInWithCustomToken(auth, token);
         } else {
@@ -191,7 +184,6 @@ const App = () => {
   }, [token, firebaseConfig]);
 
   // Real-time listeners for feedback and questions (For Admin View).
-  // This now uses the persistent 'selectedDate' state.
   useEffect(() => {
     if (!isFirebaseConnected || !db || !isAdmin) {
       return;
@@ -238,8 +230,6 @@ const App = () => {
 
   // Real-time listener for a student's cumulative log.
   useEffect(() => {
-    // *** STUDENT VIEW CLARIFICATION: This fetches all records for the student in the selected course, regardless of date. ***
-    // 이 로직은 학생이 로그인했을 때, 날짜와 상관없이 해당 과목에서 남긴 모든 기록을 불러옵니다.
     if (!isFirebaseConnected || !db || isAdmin || !nameInput) {
       setFeedbackLog([]);
       setQuestionsLog([]);
@@ -299,7 +289,7 @@ const App = () => {
         name: nameInput,
         status,
         course: selectedCourse,
-        date: new Date().toISOString().slice(0, 10), // Always record with the current date
+        date: new Date().toISOString().slice(0, 10),
         timestamp: serverTimestamp()
       });
       showMessage("Feedback submitted successfully! ✅");
@@ -329,7 +319,7 @@ const App = () => {
         text,
         type,
         course: selectedCourse,
-        date: new Date().toISOString().slice(0, 10), // Always record with the current date
+        date: new Date().toISOString().slice(0, 10),
         timestamp: serverTimestamp()
       });
       showMessage("Submission complete! ✅");
@@ -360,8 +350,13 @@ const App = () => {
   
   // Conditional rendering for Admin view vs Student view.
   if (isAdmin) {
+    // *** STYLE CHANGE: 배경 이미지와 오버레이 적용 ***
     return (
-      <div className="relative min-h-screen bg-custom-purple-bg flex items-center justify-center p-4 overflow-hidden">
+      // --- 1. 클래스 이름 변경 ---
+      <div className="relative min-h-screen bg-custom-background bg-cover bg-center flex items-center justify-center p-4 overflow-hidden">
+        {/* --- 2. 오버레이 div 추가 --- */}
+        <div className="absolute inset-0 bg-black opacity-50"></div>
+        
         <div className="relative w-full max-w-lg p-6 bg-white rounded-xl shadow-lg z-10 box-shadow-custom">
           <h1 className="text-3xl font-bold text-center mb-4 text-purple-700">Admin Dashboard</h1>
           <button
@@ -371,7 +366,6 @@ const App = () => {
             Back to student view
           </button>
           
-          {/* Admin Filters - Course and Date */}
           <div className="flex flex-col space-y-4 mb-6">
               <div className="flex justify-center items-center space-x-2">
                 <label className="text-gray-600 text-lg">Select Class Date:</label>
@@ -384,7 +378,6 @@ const App = () => {
                 />
               </div>
             </div>
-            {/* Course Selection Buttons */}
             <div className="flex flex-wrap justify-center gap-2 mb-6" id="courseButtons">
               {COURSES.map((course) => (
                 <button
@@ -431,8 +424,13 @@ const App = () => {
   }
 
   // Student view
+  // *** STYLE CHANGE: 배경 이미지와 오버레이 적용 ***
   return (
-    <div className="relative min-h-screen bg-custom-purple-bg flex items-center justify-center p-4 overflow-hidden">
+    // --- 1. 클래스 이름 변경 ---
+    <div className="relative min-h-screen bg-custom-background bg-cover bg-center flex items-center justify-center p-4 overflow-hidden">
+      {/* --- 2. 오버레이 div 추가 --- */}
+      <div className="absolute inset-0 bg-black opacity-50"></div>
+      
       {/* Main content container */}
       <div className="relative w-full max-w-lg p-6 bg-white rounded-xl shadow-lg z-10 box-shadow-custom">
         <h1 className="text-3xl font-bold text-center mb-1 text-gray-800">
