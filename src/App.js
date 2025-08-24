@@ -18,7 +18,7 @@ const App = () => {
   const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
   const token = useMemo(() => typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null, []);
   
-  // FIX 1: firebaseConfig를 useMemo로 감싸서 불필요한 재렌더링 방지
+  // FIX 1: firebaseConfig를 useMemo로 감싸서 빌드 에러 해결
   const firebaseConfig = useMemo(() => ({
       apiKey: "AIzaSyCgl2EZSBv5eerKjcFsCGojT68ZwnfGL-U",
       authDomain: "ahnstoppable-learning.firebaseapp.com",
@@ -40,7 +40,7 @@ const App = () => {
   const [questionsLog, setQuestionsLog] = useState([]);
   const [message, setMessage] = useState('');
   const [showMessageBox, setShowMessageBox] = useState(false);
-  // FIX 2: 사용하지 않는 isLoading 상태 변수 삭제
+  // FIX 2: 사용하지 않는 isLoading 변수 삭제하여 빌드 에러 해결
   const [clickedButton, setClickedButton] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
