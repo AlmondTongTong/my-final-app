@@ -164,14 +164,14 @@ const App = () => {
     <div className="w-full max-w-lg p-6 bg-white rounded-xl shadow-lg box-shadow-custom">
       {isAdmin ? (
         <>
-          <h1 className="text-3xl font-bold text-center mb-4 text-purple-700">Admin Dashboard</h1>
+          <h1 className="text-3xl font-bold text-center mb-4 text-orange-700">Admin Dashboard</h1>
           <button onClick={() => setIsAdmin(false)} className="mb-4 p-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Back to student view</button>
           <div className="flex justify-center items-center space-x-2 mb-6">
             <label className="text-gray-600 text-lg">Select Class Date:</label>
             <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="p-3 border border-gray-300 rounded-lg text-lg"/>
           </div>
           <div className="flex flex-wrap justify-center gap-2 mb-6">
-            {COURSES.map((course) => <button key={course} onClick={() => setSelectedCourse(course)} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-purple-500 text-white' : 'bg-gray-200 text-gray-800'}`}>{course}</button>)}
+            {COURSES.map((course) => <button key={course} onClick={() => setSelectedCourse(course)} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-800'}`}>{course}</button>)}
           </div>
           <h2 className="text-2xl font-semibold mb-4 text-center text-gray-700">{selectedDate} - {selectedCourse} Data</h2>
           <div className="text-left p-4 border rounded-xl mt-6">
@@ -185,10 +185,10 @@ const App = () => {
         </>
       ) : (
         <>
-          <h1 className="text-3xl font-bold text-center mb-1">Ahnstoppable Learning:<br /><span className="text-purple-700">Freely Ask, Freely Learn</span></h1>
+          <h1 className="text-3xl font-bold text-center mb-1">Ahnstoppable Learning:<br /><span className="text-orange-700">Freely Ask, Freely Learn</span></h1>
           <div className="flex justify-center space-x-2 my-2 text-3xl"><span>😁</span><span>😀</span><span>😁</span></div>
           <div className="flex flex-wrap justify-center gap-2 mb-6 mt-4">
-            {COURSES.map((course) => <button key={course} onClick={() => { setSelectedCourse(course); setNameInput(''); }} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-purple-500 text-white' : 'bg-gray-200 text-gray-800'}`}>{course}</button>)}
+            {COURSES.map((course) => <button key={course} onClick={() => { setSelectedCourse(course); setNameInput(''); }} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-800'}`}>{course}</button>)}
           </div>
           <h2 className="text-2xl font-semibold mb-4 text-center text-gray-700">{selectedCourse}</h2>
           <div className="mb-6">
@@ -196,21 +196,21 @@ const App = () => {
               <option value="">Select your name...</option>
               {COURSE_STUDENTS[selectedCourse].map((name, i) => <option key={i} value={name}>{name}</option>)}
             </select>
-            <p className="text-center text-sm text-gray-500 mt-2">{isNameEntered && isFirebaseConnected ? <span className="text-purple-600 font-bold">Hello, {getFirstName(nameInput)}!</span> : <span>Select your name to enable features.</span>}{!isFirebaseConnected && <span className="block text-red-500 font-bold mt-2">🚫 DB connection failed.</span>}</p>
+            <p className="text-center text-sm text-gray-500 mt-2">{isNameEntered && isFirebaseConnected ? <span className="text-orange-600 font-bold">Hello, {getFirstName(nameInput)}!</span> : <span>Select your name to enable features.</span>}{!isFirebaseConnected && <span className="block text-red-500 font-bold mt-2">🚫 DB connection failed.</span>}</p>
           </div>
           <div className={`text-center mb-8 ${!isNameEntered || !isFirebaseConnected ? 'opacity-50' : ''}`}>
             <p className="text-xl font-medium">Understanding Check</p>
             <div className="flex justify-center space-x-4 mt-2">
-              <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Not Understood 🙁')} disabled={!isNameEntered || !isFirebaseConnected} className={`p-4 w-12 h-12 rounded-full bg-red-500 ${clickedButton === 'Not Understood 🙁' ? 'ring-4 ring-purple-500' : ''}`}></button><span className="text-sm">Not Understood</span></div>
-              <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Confused 🤔')} disabled={!isNameEntered || !isFirebaseConnected} className={`p-4 w-12 h-12 rounded-full bg-yellow-400 ${clickedButton === 'Confused 🤔' ? 'ring-4 ring-purple-500' : ''}`}></button><span className="text-sm">Confused</span></div>
-              <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Got It! ✅')} disabled={!isNameEntered || !isFirebaseConnected} className={`p-4 w-12 h-12 rounded-full bg-green-500 ${clickedButton === 'Got It! ✅' ? 'ring-4 ring-purple-500' : ''}`}></button><span className="text-sm">Got It!</span></div>
+              <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Not Understood 🙁')} disabled={!isNameEntered || !isFirebaseConnected} className={`p-4 w-12 h-12 rounded-full bg-red-500 ${clickedButton === 'Not Understood 🙁' ? 'ring-4 ring-orange-500' : ''}`}></button><span className="text-sm">Not Understood</span></div>
+              <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Confused 🤔')} disabled={!isNameEntered || !isFirebaseConnected} className={`p-4 w-12 h-12 rounded-full bg-yellow-400 ${clickedButton === 'Confused 🤔' ? 'ring-4 ring-orange-500' : ''}`}></button><span className="text-sm">Confused</span></div>
+              <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Got It! ✅')} disabled={!isNameEntered || !isFirebaseConnected} className={`p-4 w-12 h-12 rounded-full bg-green-500 ${clickedButton === 'Got It! ✅' ? 'ring-4 ring-orange-500' : ''}`}></button><span className="text-sm">Got It!</span></div>
             </div>
           </div>
           <div className={`space-y-4 mb-6 ${!isNameEntered || !isFirebaseConnected ? 'opacity-50' : ''}`}>
             <p className="text-lg font-medium">Leave a Question or Comment</p>
-            <form onSubmit={(e) => handleAddContent(e, 'question')} className="flex space-x-2"><input type="text" value={questionInput} onChange={(e) => setQuestionInput(e.target.value)} placeholder="Enter a question" disabled={!isNameEntered || !isFirebaseConnected} className="flex-1 p-3 border rounded-lg text-lg" /><button type="submit" disabled={!isNameEntered || !isFirebaseConnected} className="p-3 bg-purple-500 text-white rounded-lg">Add</button></form>
+            <form onSubmit={(e) => handleAddContent(e, 'question')} className="flex space-x-2"><input type="text" value={questionInput} onChange={(e) => setQuestionInput(e.target.value)} placeholder="Enter a question" disabled={!isNameEntered || !isFirebaseConnected} className="flex-1 p-3 border rounded-lg text-lg" /><button type="submit" disabled={!isNameEntered || !isFirebaseConnected} className="p-3 bg-orange-500 text-white rounded-lg">Add</button></form>
             <p className="text-base font-semibold mt-4">What do you think? 🤔</p>
-            <form onSubmit={(e) => handleAddContent(e, 'comment')} className="flex space-x-2"><input type="text" value={commentInput} onChange={(e) => setCommentInput(e.target.value)} placeholder="Enter your thoughts" disabled={!isNameEntered || !isFirebaseConnected} className="flex-1 p-3 border rounded-lg text-lg" /><button type="submit" disabled={!isNameEntered || !isFirebaseConnected} className="p-3 bg-purple-500 text-white rounded-lg">Add</button></form>
+            <form onSubmit={(e) => handleAddContent(e, 'comment')} className="flex space-x-2"><input type="text" value={commentInput} onChange={(e) => setCommentInput(e.target.value)} placeholder="Enter your thoughts" disabled={!isNameEntered || !isFirebaseConnected} className="flex-1 p-3 border rounded-lg text-lg" /><button type="submit" disabled={!isNameEntered || !isFirebaseConnected} className="p-3 bg-orange-500 text-white rounded-lg">Add</button></form>
           </div>
           <div className={`text-left p-4 border rounded-xl mt-6 ${!isNameEntered || !isFirebaseConnected ? 'opacity-50' : ''}`}>
             <h3 className="text-xl font-semibold">📊 My Understanding Log</h3>
@@ -220,7 +220,7 @@ const App = () => {
           </div>
           <div className="flex flex-col items-center mt-8 p-4 border-t">
             <p className="text-md font-medium mb-2">Admin Login</p>
-            <div className="flex space-x-2"><input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} placeholder="Password" className="p-2 border rounded-lg text-sm" /><button onClick={handleAdminLogin} className="p-2 bg-purple-500 text-white rounded-lg">Login</button></div>
+            <div className="flex space-x-2"><input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} placeholder="Password" className="p-2 border rounded-lg text-sm" /><button onClick={handleAdminLogin} className="p-2 bg-orange-500 text-white rounded-lg">Login</button></div>
           </div>
         </>
       )}
@@ -228,29 +228,37 @@ const App = () => {
   );
 
   return (
-    <div className="relative min-h-screen w-full bg-gray-100 flex items-center justify-center p-4">
-      {/* --- START: Masonry Grid Background --- */}
-      {/* This container holds all the grid-placed photos. It's behind the main content. */}
-      <div className="absolute inset-0 w-full h-full grid grid-cols-5 grid-rows-4 gap-2 p-2">
-        <img src="/photo1.jpg" alt="Collage 1" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-2" />
-        <img src="/photo2.jpg" alt="Collage 2" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-1" />
-        <img src="/photo3.jpg" alt="Collage 3" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-1" />
-        <img src="/photo4.jpg" alt="Collage 4" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-2" />
-        <img src="/photo5.jpg" alt="Collage 5" className="w-full h-full object-cover rounded-lg shadow-lg col-span-2 row-span-2" />
-        <img src="/photo6.jpg" alt="Collage 6" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-2" />
-        <img src="/photo7.jpg" alt="Collage 7" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-2" />
-        <img src="/photo8.jpg" alt="Collage 8" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-1" />
-        <img src="/photo9.jpg" alt="Collage 9" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-2" />
-        <img src="/photo10.jpg" alt="Collage 10" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-1" />
-        <img src="/photo11.jpg" alt="Collage 11" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-1" />
-        <img src="/photo12.jpg" alt="Collage 12" className="w-full h-full object-cover rounded-lg shadow-lg col-span-2 row-span-1" />
-        <img src="/photo13.jpg" alt="Collage 13" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-1" />
-        <img src="/photo14.jpg" alt="Collage 14" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-1" />
+    <div className="relative min-h-screen w-full bg-blue-100 flex items-center justify-center p-4 overflow-hidden">
+      {/* --- START: Scrapbook Background --- */}
+      <div className="absolute inset-0 w-full h-full overflow-hidden">
+        {/* Photos */}
+        <img src="/photo1.jpg" alt="Collage 1" className="absolute top-[5%] left-[5%] w-40 md:w-48 rounded-lg shadow-lg transform -rotate-6 z-10" />
+        <img src="/photo2.jpg" alt="Collage 2" className="absolute top-[8%] right-[8%] w-44 md:w-56 rounded-lg shadow-lg transform rotate-3 z-10" />
+        <img src="/photo3.jpg" alt="Collage 3" className="absolute bottom-[12%] left-[10%] w-36 md:w-44 rounded-lg shadow-lg transform rotate-2 z-10" />
+        <img src="/photo4.jpg" alt="Collage 4" className="absolute bottom-[5%] right-[5%] w-48 md:w-60 rounded-lg shadow-lg transform -rotate-3 z-10" />
+        <img src="/photo5.jpg" alt="Collage 5" className="absolute top-[35%] left-[15%] w-32 md:w-40 rounded-lg shadow-lg transform rotate-8 z-10" />
+        <img src="/photo6.jpg" alt="Collage 6" className="absolute top-[50%] right-[12%] w-40 md:w-52 rounded-lg shadow-lg transform -rotate-5 z-10" />
+        <img src="/photo7.jpg" alt="Collage 7" className="absolute top-[20%] left-[30%] w-36 md:w-44 rounded-lg shadow-lg transform rotate-4 z-10" />
+        <img src="/photo8.jpg" alt="Collage 8" className="absolute bottom-[25%] right-[25%] w-40 md:w-48 rounded-lg shadow-lg transform rotate-5 z-10" />
+        <img src="/photo9.jpg" alt="Collage 9" className="absolute top-[68%] left-[2%] w-44 md:w-56 rounded-lg shadow-lg transform -rotate-8 z-10" />
+        <img src="/photo10.jpg" alt="Collage 10" className="absolute top-[3%] right-[35%] w-32 md:w-40 rounded-lg shadow-lg transform rotate-6 z-10" />
+        <img src="/photo11.jpg" alt="Collage 11" className="absolute bottom-[6%] left-[45%] w-40 md:w-52 rounded-lg shadow-lg transform -rotate-2 z-10" />
+        <img src="/photo12.jpg" alt="Collage 12" className="absolute bottom-[50%] right-[2%] w-36 md:w-44 rounded-lg shadow-lg transform rotate-12 z-10" />
+        <img src="/photo13.jpg" alt="Collage 13" className="absolute top-[75%] right-[30%] w-44 md:w-56 rounded-lg shadow-lg transform -rotate-4 z-10" />
+        <img src="/photo14.jpg" alt="Collage 14" className="absolute top-[40%] left-[1%] w-36 md:w-48 rounded-lg shadow-lg transform -rotate-12 z-10" />
+        
+        {/* --- NEW: Text quotes inside styled boxes --- */}
+        <div className="absolute top-[25%] right-[28%] w-64 p-4 z-10 transform -rotate-2 bg-white rounded-lg shadow-lg">
+            <p className="font-serif text-lg text-gray-800 text-center">"Learning is not about memorizing facts, but learning to ask the right questions."</p>
+        </div>
+        <div className="absolute bottom-[20%] left-[25%] w-72 p-4 z-10 transform rotate-3 bg-yellow-50 rounded-lg shadow-lg">
+            <p className="font-serif text-xl text-gray-700 font-semibold text-center">"He who asks a question is a fool for five minutes; he who does not ask remains a fool forever."</p>
+            <p className="text-right text-gray-600 italic mt-2">- Talmudic proverb</p>
+        </div>
       </div>
-      {/* --- END: Masonry Grid Background --- */}
+      {/* --- END: Scrapbook Background --- */}
       
-      {/* Center Content Column. The 'relative' and 'z-10' place it ON TOP of the photo grid. */}
-      <div className="relative z-10">
+      <div className="relative z-20">
         <MainContent />
       </div>
       
