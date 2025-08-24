@@ -230,26 +230,25 @@ const App = () => {
   return (
     <div className="relative min-h-screen w-full bg-gray-100 flex items-center justify-center p-4 overflow-hidden">
       {/* --- START: Scrapbook Background Photos --- */}
-      {/* This container holds all the absolutely positioned photos. They will be in the background. */}
       <div className="absolute inset-0 w-full h-full overflow-hidden">
-        <img src="/photo1.jpg" alt="Collage photo 1" className="absolute top-[5%] left-[5%] w-48 h-auto rounded-lg shadow-lg transform -rotate-6 z-0" />
-        <img src="/photo2.jpg" alt="Collage photo 2" className="absolute top-[10%] right-[8%] w-52 h-auto rounded-lg shadow-lg transform rotate-3 z-0" />
-        <img src="/photo3.jpg" alt="Collage photo 3" className="absolute bottom-[15%] left-[10%] w-44 h-auto rounded-lg shadow-lg transform rotate-2 z-0" />
-        <img src="/photo4.jpg" alt="Collage photo 4" className="absolute bottom-[5%] right-[5%] w-56 h-auto rounded-lg shadow-lg transform -rotate-3 z-0" />
-        <img src="/photo5.jpg" alt="Collage photo 5" className="absolute top-[40%] left-[15%] w-36 h-auto rounded-lg shadow-lg transform rotate-8 z-0" />
-        <img src="/photo6.jpg" alt="Collage photo 6" className="absolute top-[55%] right-[12%] w-48 h-auto rounded-lg shadow-lg transform -rotate-5 z-0" />
-        <img src="/photo7.jpg" alt="Collage photo 7" className="absolute top-[25%] left-[30%] w-40 h-auto rounded-lg shadow-lg transform rotate-4 z-0" />
-        <img src="/photo8.jpg" alt="Collage photo 8" className="absolute bottom-[30%] right-[25%] w-44 h-auto rounded-lg shadow-lg transform rotate-5 z-0" />
-        <img src="/photo9.jpg" alt="Collage photo 9" className="absolute top-[70%] left-[2%] w-52 h-auto rounded-lg shadow-lg transform -rotate-8 z-0" />
-        <img src="/photo10.jpg" alt="Collage photo 10" className="absolute top-[5%] right-[35%] w-36 h-auto rounded-lg shadow-lg transform rotate-6 z-0" />
-        <img src="/photo11.jpg" alt="Collage photo 11" className="absolute bottom-[8%] left-[45%] w-48 h-auto rounded-lg shadow-lg transform -rotate-2 z-0" />
-        <img src="/photo12.jpg" alt="Collage photo 12" className="absolute bottom-[55%] right-[2%] w-40 h-auto rounded-lg shadow-lg transform rotate-12 z-0" />
-        <img src="/photo13.jpg" alt="Collage photo 13" className="absolute top-[80%] right-[30%] w-52 h-auto rounded-lg shadow-lg transform -rotate-4 z-0" />
-        <img src="/photo14.jpg" alt="Collage photo 14" className="absolute top-[45%] left-[1%] w-44 h-auto rounded-lg shadow-lg transform -rotate-12 z-0" />
+        {/* --- FIX: 'photo'라는 중복 단어를 alt 속성에서 제거했습니다 --- */}
+        <img src="/photo1.jpg" alt="Collage 1" className="absolute top-[5%] left-[5%] w-48 h-auto rounded-lg shadow-lg transform -rotate-6 z-0" />
+        <img src="/photo2.jpg" alt="Collage 2" className="absolute top-[10%] right-[8%] w-52 h-auto rounded-lg shadow-lg transform rotate-3 z-0" />
+        <img src="/photo3.jpg" alt="Collage 3" className="absolute bottom-[15%] left-[10%] w-44 h-auto rounded-lg shadow-lg transform rotate-2 z-0" />
+        <img src="/photo4.jpg" alt="Collage 4" className="absolute bottom-[5%] right-[5%] w-56 h-auto rounded-lg shadow-lg transform -rotate-3 z-0" />
+        <img src="/photo5.jpg" alt="Collage 5" className="absolute top-[40%] left-[15%] w-36 h-auto rounded-lg shadow-lg transform rotate-8 z-0" />
+        <img src="/photo6.jpg" alt="Collage 6" className="absolute top-[55%] right-[12%] w-48 h-auto rounded-lg shadow-lg transform -rotate-5 z-0" />
+        <img src="/photo7.jpg" alt="Collage 7" className="absolute top-[25%] left-[30%] w-40 h-auto rounded-lg shadow-lg transform rotate-4 z-0" />
+        <img src="/photo8.jpg" alt="Collage 8" className="absolute bottom-[30%] right-[25%] w-44 h-auto rounded-lg shadow-lg transform rotate-5 z-0" />
+        <img src="/photo9.jpg" alt="Collage 9" className="absolute top-[70%] left-[2%] w-52 h-auto rounded-lg shadow-lg transform -rotate-8 z-0" />
+        <img src="/photo10.jpg" alt="Collage 10" className="absolute top-[5%] right-[35%] w-36 h-auto rounded-lg shadow-lg transform rotate-6 z-0" />
+        <img src="/photo11.jpg" alt="Collage 11" className="absolute bottom-[8%] left-[45%] w-48 h-auto rounded-lg shadow-lg transform -rotate-2 z-0" />
+        <img src="/photo12.jpg" alt="Collage 12" className="absolute bottom-[55%] right-[2%] w-40 h-auto rounded-lg shadow-lg transform rotate-12 z-0" />
+        <img src="/photo13.jpg" alt="Collage 13" className="absolute top-[80%] right-[30%] w-52 h-auto rounded-lg shadow-lg transform -rotate-4 z-0" />
+        <img src="/photo14.jpg" alt="Collage 14" className="absolute top-[45%] left-[1%] w-44 h-auto rounded-lg shadow-lg transform -rotate-12 z-0" />
       </div>
       {/* --- END: Scrapbook Background Photos --- */}
       
-      {/* Center Content Column. The 'relative' and 'z-10' are important to place it ON TOP of the photos. */}
       <div className="relative z-10">
         <MainContent />
       </div>
