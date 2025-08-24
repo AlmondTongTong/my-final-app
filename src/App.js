@@ -228,30 +228,35 @@ const App = () => {
   );
 
   return (
-    <div className="relative min-h-screen w-full bg-gray-100 flex items-center justify-center p-4 overflow-hidden">
-      <div className="absolute inset-0 w-full h-full overflow-hidden">
-        <img src="/photo1.jpg" alt="Collage 1" className="absolute top-[5%] left-[5%] w-48 h-auto rounded-lg shadow-lg transform -rotate-6 z-0" />
-        <img src="/photo2.jpg" alt="Collage 2" className="absolute top-[10%] right-[8%] w-52 h-auto rounded-lg shadow-lg transform rotate-3 z-0" />
-        <img src="/photo3.jpg" alt="Collage 3" className="absolute bottom-[15%] left-[10%] w-44 h-auto rounded-lg shadow-lg transform rotate-2 z-0" />
-        <img src="/photo4.jpg" alt="Collage 4" className="absolute bottom-[5%] right-[5%] w-56 h-auto rounded-lg shadow-lg transform -rotate-3 z-0" />
-        <img src="/photo5.jpg" alt="Collage 5" className="absolute top-[40%] left-[15%] w-36 h-auto rounded-lg shadow-lg transform rotate-8 z-0" />
-        <img src="/photo6.jpg" alt="Collage 6" className="absolute top-[55%] right-[12%] w-48 h-auto rounded-lg shadow-lg transform -rotate-5 z-0" />
-        <img src="/photo7.jpg" alt="Collage 7" className="absolute top-[25%] left-[30%] w-40 h-auto rounded-lg shadow-lg transform rotate-4 z-0" />
-        <img src="/photo8.jpg" alt="Collage 8" className="absolute bottom-[30%] right-[25%] w-44 h-auto rounded-lg shadow-lg transform rotate-5 z-0" />
-        <img src="/photo9.jpg" alt="Collage 9" className="absolute top-[70%] left-[2%] w-52 h-auto rounded-lg shadow-lg transform -rotate-8 z-0" />
-        <img src="/photo10.jpg" alt="Collage 10" className="absolute top-[5%] right-[35%] w-36 h-auto rounded-lg shadow-lg transform rotate-6 z-0" />
-        <img src="/photo11.jpg" alt="Collage 11" className="absolute bottom-[8%] left-[45%] w-48 h-auto rounded-lg shadow-lg transform -rotate-2 z-0" />
-        <img src="/photo12.jpg" alt="Collage 12" className="absolute bottom-[55%] right-[2%] w-40 h-auto rounded-lg shadow-lg transform rotate-12 z-0" />
-        <img src="/photo13.jpg" alt="Collage 13" className="absolute top-[80%] right-[30%] w-52 h-auto rounded-lg shadow-lg transform -rotate-4 z-0" />
-        <img src="/photo14.jpg" alt="Collage 14" className="absolute top-[45%] left-[1%] w-44 h-auto rounded-lg shadow-lg transform -rotate-12 z-0" />
+    <div className="relative min-h-screen w-full bg-gray-100 flex items-center justify-center p-4">
+      {/* --- START: Masonry Grid Background --- */}
+      {/* This container holds all the grid-placed photos. It's behind the main content. */}
+      <div className="absolute inset-0 w-full h-full grid grid-cols-5 grid-rows-4 gap-2 p-2">
+        <img src="/photo1.jpg" alt="Collage 1" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-2" />
+        <img src="/photo2.jpg" alt="Collage 2" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-1" />
+        <img src="/photo3.jpg" alt="Collage 3" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-1" />
+        <img src="/photo4.jpg" alt="Collage 4" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-2" />
+        <img src="/photo5.jpg" alt="Collage 5" className="w-full h-full object-cover rounded-lg shadow-lg col-span-2 row-span-2" />
+        <img src="/photo6.jpg" alt="Collage 6" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-2" />
+        <img src="/photo7.jpg" alt="Collage 7" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-2" />
+        <img src="/photo8.jpg" alt="Collage 8" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-1" />
+        <img src="/photo9.jpg" alt="Collage 9" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-2" />
+        <img src="/photo10.jpg" alt="Collage 10" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-1" />
+        <img src="/photo11.jpg" alt="Collage 11" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-1" />
+        <img src="/photo12.jpg" alt="Collage 12" className="w-full h-full object-cover rounded-lg shadow-lg col-span-2 row-span-1" />
+        <img src="/photo13.jpg" alt="Collage 13" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-1" />
+        <img src="/photo14.jpg" alt="Collage 14" className="w-full h-full object-cover rounded-lg shadow-lg col-span-1 row-span-1" />
       </div>
+      {/* --- END: Masonry Grid Background --- */}
       
+      {/* Center Content Column. The 'relative' and 'z-10' place it ON TOP of the photo grid. */}
       <div className="relative z-10">
         <MainContent />
       </div>
       
+      {/* Message Box */}
       {showMessageBox && (
-        <div className="fixed top-1/2 left-1/2 -translate-x-1-2 -translate-y-1/2 bg-gray-900 text-white p-6 rounded-xl text-center z-50">
+        <div className="fixed top-1/2 left-1/2 -translate-x-1-2 -translate-y-1-2 bg-gray-900 text-white p-6 rounded-xl text-center z-50">
           {message}
         </div>
       )}
