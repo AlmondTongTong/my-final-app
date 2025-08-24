@@ -18,7 +18,6 @@ const App = () => {
   const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
   const token = useMemo(() => typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null, []);
   
-  // FIX 1: firebaseConfig를 useMemo로 감싸서 빌드 에러 해결
   const firebaseConfig = useMemo(() => ({
       apiKey: "AIzaSyCgl2EZSBv5eerKjcFsCGojT68ZwnfGL-U",
       authDomain: "ahnstoppable-learning.firebaseapp.com",
@@ -40,7 +39,6 @@ const App = () => {
   const [questionsLog, setQuestionsLog] = useState([]);
   const [message, setMessage] = useState('');
   const [showMessageBox, setShowMessageBox] = useState(false);
-  // FIX 2: 사용하지 않는 isLoading 변수 삭제하여 빌드 에러 해결
   const [clickedButton, setClickedButton] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
@@ -233,9 +231,14 @@ const App = () => {
     <div className="min-h-screen bg-gray-100 grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-4">
       {/* Left Image Column */}
       <div className="hidden md:flex flex-col space-y-4">
+        {/* --- 1장의 사진을 추가하여 총 7장으로 만듭니다 --- */}
         <img src="/photo1.jpg" alt="Student work 1" className="rounded-lg shadow-lg" />
         <img src="/photo2.jpg" alt="Student work 2" className="rounded-lg shadow-lg" />
         <img src="/photo3.jpg" alt="Student work 3" className="rounded-lg shadow-lg" />
+        <img src="/photo4.jpg" alt="Student work 4" className="rounded-lg shadow-lg" />
+        <img src="/photo5.jpg" alt="Student work 5" className="rounded-lg shadow-lg" />
+        <img src="/photo6.jpg" alt="Student work 6" className="rounded-lg shadow-lg" />
+        <img src="/photo7.jpg" alt="Student work 7" className="rounded-lg shadow-lg" />
       </div>
 
       {/* Center Content Column (takes up 2 grid cells) */}
@@ -245,9 +248,14 @@ const App = () => {
 
       {/* Right Image Column */}
       <div className="hidden md:flex flex-col space-y-4">
-        <img src="/photo4.jpg" alt="Student work 4" className="rounded-lg shadow-lg" />
-        <img src="/photo5.jpg" alt="Student work 5" className="rounded-lg shadow-lg" />
-        <img src="/photo6.jpg" alt="Student work 6" className="rounded-lg shadow-lg" />
+        {/* --- 2장의 사진을 추가하여 총 7장으로 만듭니다 --- */}
+        <img src="/photo8.jpg" alt="Student work 8" className="rounded-lg shadow-lg" />
+        <img src="/photo9.jpg" alt="Student work 9" className="rounded-lg shadow-lg" />
+        <img src="/photo10.jpg" alt="Student work 10" className="rounded-lg shadow-lg" />
+        <img src="/photo11.jpg" alt="Student work 11" className="rounded-lg shadow-lg" />
+        <img src="/photo12.jpg" alt="Student work 12" className="rounded-lg shadow-lg" />
+        <img src="/photo13.jpg" alt="Student work 13" className="rounded-lg shadow-lg" />
+        <img src="/photo14.jpg" alt="Student work 14" className="rounded-lg shadow-lg" />
       </div>
       
       {/* Message Box */}
