@@ -41,7 +41,6 @@ const App = () => {
   const [message, setMessage] = useState('');
   const [showMessageBox, setShowMessageBox] = useState(false);
   // FIX 2: 사용하지 않는 isLoading 상태 변수 삭제
-  // const [isLoading, setIsLoading] = useState(true);
   const [clickedButton, setClickedButton] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
@@ -69,7 +68,6 @@ const App = () => {
 
   useEffect(() => {
     const initializeFirebase = async () => {
-      // setIsLoading(true); // FIX 2: 삭제
       try {
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -84,7 +82,7 @@ const App = () => {
       } catch (e) {
         console.error("Firebase initialization failed:", e);
         setIsFirebaseConnected(false);
-      } // FIX 2: finally 블록 삭제
+      }
     };
     initializeFirebase();
   }, [token, firebaseConfig]);
