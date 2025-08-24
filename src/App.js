@@ -161,7 +161,7 @@ const App = () => {
   const isNameEntered = nameInput.trim().length > 0;
   
   const MainContent = () => (
-    <div className="relative w-full max-w-lg p-6 bg-white rounded-xl shadow-lg z-10 box-shadow-custom">
+    <div className="w-full max-w-lg p-6 bg-white rounded-xl shadow-lg box-shadow-custom">
       {isAdmin ? (
         <>
           <h1 className="text-3xl font-bold text-center mb-4 text-purple-700">Admin Dashboard</h1>
@@ -228,34 +228,30 @@ const App = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-100 grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-4">
-      {/* Left Image Column */}
-      <div className="hidden md:flex flex-col space-y-4">
-        {/* --- 1장의 사진을 추가하여 총 7장으로 만듭니다 --- */}
-        <img src="/photo1.jpg" alt="Student work 1" className="rounded-lg shadow-lg" />
-        <img src="/photo2.jpg" alt="Student work 2" className="rounded-lg shadow-lg" />
-        <img src="/photo3.jpg" alt="Student work 3" className="rounded-lg shadow-lg" />
-        <img src="/photo4.jpg" alt="Student work 4" className="rounded-lg shadow-lg" />
-        <img src="/photo5.jpg" alt="Student work 5" className="rounded-lg shadow-lg" />
-        <img src="/photo6.jpg" alt="Student work 6" className="rounded-lg shadow-lg" />
-        <img src="/photo7.jpg" alt="Student work 7" className="rounded-lg shadow-lg" />
+    <div className="relative min-h-screen w-full bg-gray-100 flex items-center justify-center p-4 overflow-hidden">
+      {/* --- START: Scrapbook Background Photos --- */}
+      {/* This container holds all the absolutely positioned photos. They will be in the background. */}
+      <div className="absolute inset-0 w-full h-full overflow-hidden">
+        <img src="/photo1.jpg" alt="Collage photo 1" className="absolute top-[5%] left-[5%] w-48 h-auto rounded-lg shadow-lg transform -rotate-6 z-0" />
+        <img src="/photo2.jpg" alt="Collage photo 2" className="absolute top-[10%] right-[8%] w-52 h-auto rounded-lg shadow-lg transform rotate-3 z-0" />
+        <img src="/photo3.jpg" alt="Collage photo 3" className="absolute bottom-[15%] left-[10%] w-44 h-auto rounded-lg shadow-lg transform rotate-2 z-0" />
+        <img src="/photo4.jpg" alt="Collage photo 4" className="absolute bottom-[5%] right-[5%] w-56 h-auto rounded-lg shadow-lg transform -rotate-3 z-0" />
+        <img src="/photo5.jpg" alt="Collage photo 5" className="absolute top-[40%] left-[15%] w-36 h-auto rounded-lg shadow-lg transform rotate-8 z-0" />
+        <img src="/photo6.jpg" alt="Collage photo 6" className="absolute top-[55%] right-[12%] w-48 h-auto rounded-lg shadow-lg transform -rotate-5 z-0" />
+        <img src="/photo7.jpg" alt="Collage photo 7" className="absolute top-[25%] left-[30%] w-40 h-auto rounded-lg shadow-lg transform rotate-4 z-0" />
+        <img src="/photo8.jpg" alt="Collage photo 8" className="absolute bottom-[30%] right-[25%] w-44 h-auto rounded-lg shadow-lg transform rotate-5 z-0" />
+        <img src="/photo9.jpg" alt="Collage photo 9" className="absolute top-[70%] left-[2%] w-52 h-auto rounded-lg shadow-lg transform -rotate-8 z-0" />
+        <img src="/photo10.jpg" alt="Collage photo 10" className="absolute top-[5%] right-[35%] w-36 h-auto rounded-lg shadow-lg transform rotate-6 z-0" />
+        <img src="/photo11.jpg" alt="Collage photo 11" className="absolute bottom-[8%] left-[45%] w-48 h-auto rounded-lg shadow-lg transform -rotate-2 z-0" />
+        <img src="/photo12.jpg" alt="Collage photo 12" className="absolute bottom-[55%] right-[2%] w-40 h-auto rounded-lg shadow-lg transform rotate-12 z-0" />
+        <img src="/photo13.jpg" alt="Collage photo 13" className="absolute top-[80%] right-[30%] w-52 h-auto rounded-lg shadow-lg transform -rotate-4 z-0" />
+        <img src="/photo14.jpg" alt="Collage photo 14" className="absolute top-[45%] left-[1%] w-44 h-auto rounded-lg shadow-lg transform -rotate-12 z-0" />
       </div>
-
-      {/* Center Content Column (takes up 2 grid cells) */}
-      <div className="col-span-1 md:col-span-2 flex justify-center">
+      {/* --- END: Scrapbook Background Photos --- */}
+      
+      {/* Center Content Column. The 'relative' and 'z-10' are important to place it ON TOP of the photos. */}
+      <div className="relative z-10">
         <MainContent />
-      </div>
-
-      {/* Right Image Column */}
-      <div className="hidden md:flex flex-col space-y-4">
-        {/* --- 2장의 사진을 추가하여 총 7장으로 만듭니다 --- */}
-        <img src="/photo8.jpg" alt="Student work 8" className="rounded-lg shadow-lg" />
-        <img src="/photo9.jpg" alt="Student work 9" className="rounded-lg shadow-lg" />
-        <img src="/photo10.jpg" alt="Student work 10" className="rounded-lg shadow-lg" />
-        <img src="/photo11.jpg" alt="Student work 11" className="rounded-lg shadow-lg" />
-        <img src="/photo12.jpg" alt="Student work 12" className="rounded-lg shadow-lg" />
-        <img src="/photo13.jpg" alt="Student work 13" className="rounded-lg shadow-lg" />
-        <img src="/photo14.jpg" alt="Student work 14" className="rounded-lg shadow-lg" />
       </div>
       
       {/* Message Box */}
