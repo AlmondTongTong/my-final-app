@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
-import { getFirestore, collection, query, where, addDoc, onSnapshot, serverTimestamp, doc, setDoc, getDoc, updateDoc, getDocs, limit } from 'firebase/firestore';
+// --- FIX: Removed unused 'getDocs' and 'limit' from import ---
+import { getFirestore, collection, query, where, addDoc, onSnapshot, serverTimestamp, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 
 const COURSES = ["ADV 375-01", "ADV 375-02", "ADV 461"];
 const COURSE_STUDENTS = {
@@ -12,7 +13,6 @@ const COURSE_STUDENTS = {
   "ADV 461": [ "Bonk, Maya", "Burrow, Elizabeth", "Campos, Victoria", "Cantada, Cristian", "Chong, Timothy", "Chung, Sooa", "Cwiertnia, Zachary", "Fernandez, Francisco", "Fok, Alexis", "Gilbert, Jasmine", "Hall, Lily", "Hosea, Nicholas", "Jang, Da Eun", "Kim, Lynn", "Kim, Noelle", "Koning, William", "Lee, Edmund", "Lewandowski, Luke", "Leyson, Noah", "Lopez, Tatum", "Murphy, Alexander", "Swendsen, Katherine" ],
 };
 
-// --- NEW FEATURE: Reusable Graph Component ---
 const TalentGraph = ({ talents, type, getFirstName }) => {
     if (talents.length === 0) return <p className="text-gray-400">No talent data yet.</p>;
 
@@ -149,7 +149,6 @@ const App = () => {
     return () => clearInterval(interval);
   }, [selectedCourse]);
 
-  // --- MODIFIED: This useEffect now runs for BOTH student and admin to get the talent leaderboard data ---
   useEffect(() => {
     if (!isFirebaseConnected || !db) return;
     const publicDataPath = `/artifacts/${appId}/public/data`;
@@ -180,7 +179,13 @@ const App = () => {
       const publicDataPath = `/artifacts/${appId}/public/data`;
       const studentLogQuery = query(collection(db, `${publicDataPath}/questions`), where("course", "==", selectedCourse), where("name", "==", adminSelectedStudent));
       const unsubLog = onSnapshot(studentLogQuery, (snap) => setAdminStudentLog(snap.docs.map(doc => doc.data()).sort((a, b) => b.timestamp - a.timestamp)));
-      return () => unsubLog();
+      
+      const studentTalentRef = doc(db, `${publicDataPath}/talents`, adminSelectedStudent);
+      const unsubTalent = onSnapshot(studentTalentRef, (doc) => {
+        if (doc.exists()) { setAdminStudentTalent(doc.data().totalTalents); } else { setAdminStudentTalent(0); }
+      });
+
+      return () => { unsubLog(); unsubTalent(); };
   }, [isFirebaseConnected, db, selectedCourse, adminSelectedStudent, appId, isAdmin]);
 
   useEffect(() => {
@@ -210,7 +215,6 @@ const App = () => {
     } catch(e) { console.error("Error giving talent: ", e); }
   }, [db, appId, selectedCourse]);
 
-  // --- NEW TALENT LOGIC: Every post gives +1 Talent ---
   const handleAddContent = useCallback(async (text, type) => {
     if (!nameInput.trim() || !text.trim()) return showMessage("Please select your name and enter a message.");
     
@@ -220,7 +224,6 @@ const App = () => {
     try {
       await addDoc(collection(db, `${publicDataPath}/questions`), { name: nameInput, text, type, course: selectedCourse, date: today, timestamp: serverTimestamp() });
       showMessage("Submission complete! ✅");
-      // Automatically give a talent for EVERY submission
       await handleGiveTalent(nameInput);
     } catch (e) { 
         console.error("Error adding content: ", e);
@@ -257,6 +260,11 @@ const App = () => {
           {adminSelectedStudent ? (
             <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
               <h3 className="text-xl font-semibold text-gray-100">All Logs for {getFirstName(adminSelectedStudent)}</h3>
+              {/* --- FIX: Restored the total talent display for the selected student --- */}
+              <div className="flex justify-center items-center text-center my-4 p-3 bg-yellow-400 text-black rounded-lg">
+                  <img src="/talent-coin.png" alt="Talent coin" className="w-6 h-6 mr-2" />
+                  <p className="font-bold text-lg">Total Talents: {adminStudentTalent}</p>
+              </div>
               <ul>{adminStudentLog.map((log, i) => (
                 <li key={i} className="p-2 border-b border-slate-700 text-gray-300 flex justify-between items-center">
                   <span><span className="font-bold">{log.date}</span> [{log.type}]: {log.text}</span>
@@ -282,7 +290,6 @@ const App = () => {
               </div>
             </>
           )}
-          {/* --- ADMIN GRAPH --- */}
           <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
             <h3 className="text-xl font-semibold text-gray-100 mb-4">🏆 {selectedCourse} Talent Leaderboard</h3>
             <TalentGraph talents={talentsLog} type="admin" getFirstName={getFirstName} />
@@ -315,7 +322,6 @@ const App = () => {
                 <p className="font-bold text-lg">My Total Talents: {myTotalTalents}</p>
             </div>
             
-            {/* --- STUDENT GRAPH --- */}
             <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
               <h3 className="text-xl font-semibold text-gray-100 mb-4">Class Score Range</h3>
               <TalentGraph talents={talentsLog} type="student" getFirstName={getFirstName} />
