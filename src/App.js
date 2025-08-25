@@ -31,28 +31,10 @@ const isWithinClassTime = (courseName) => {
     }
 };
 
-// --- FIX 1: Using <textarea> to prevent Enter key submission ---
 const ContentForm = ({ type, onAddContent, isEnabled, placeholder }) => {
   const [text, setText] = useState('');
   const handleSubmit = (event) => { event.preventDefault(); onAddContent(text, type); setText(''); };
-  return ( 
-    <form onSubmit={handleSubmit} className="flex space-x-2"> 
-      <textarea
-        value={text} 
-        onChange={(e) => setText(e.target.value)} 
-        placeholder={placeholder} 
-        disabled={!isEnabled} 
-        className="flex-1 p-3 border bg-slate-700 border-slate-500 rounded-lg text-lg resize-none h-24" 
-      />
-      <button 
-        type="submit" 
-        disabled={!isEnabled || !text.trim()} 
-        className="p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg disabled:opacity-50 self-end"
-      >
-        Add
-      </button> 
-    </form> 
-  );
+  return ( <form onSubmit={handleSubmit} className="flex space-x-2"> <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} disabled={!isEnabled} className="flex-1 p-3 border bg-slate-700 border-slate-500 rounded-lg text-lg resize-none h-24" /> <button type="submit" disabled={!isEnabled || !text.trim()} className="p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg disabled:opacity-50 self-end" > Add </button> </form> );
 };
 
 const AdminLoginForm = ({ onAdminLogin }) => {
@@ -63,7 +45,6 @@ const AdminLoginForm = ({ onAdminLogin }) => {
 
 const App = () => {
   const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-  
   const [db, setDb] = useState(null);
   const [isFirebaseConnected, setIsFirebaseConnected] = useState(false);
   const [nameInput, setNameInput] = useState('');
@@ -73,7 +54,6 @@ const App = () => {
   const [showMessageBox, setShowMessageBox] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const ADMIN_PASSWORD = '0811';
-  
   const [adminSelectedDate, setAdminSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [studentSelectedDate, setStudentSelectedDate] = useState('');
   const [talentsLog, setTalentsLog] = useState([]);
@@ -85,11 +65,14 @@ const App = () => {
   const [talentTransactions, setTalentTransactions] = useState([]);
   const [dailyProgress, setDailyProgress] = useState({ question_comment: 0, reasoning: 0 });
   const [studentActivityLog, setStudentActivityLog] = useState([]);
-
   const [pinInput, setPinInput] = useState('');
   const [pinConfirmationInput, setPinConfirmationInput] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isPinRegistered, setIsPinRegistered] = useState(false);
+  // --- FEATURE RESTORED: State for button click animation and feedback logs ---
+  const [clickedButton, setClickedButton] = useState(null);
+  const [feedbackLog, setFeedbackLog] = useState([]);
+  const [studentFeedbackLog, setStudentFeedbackLog] = useState([]);
   
   const showMessage = useCallback((msg) => { setMessage(msg); setShowMessageBox(true); setTimeout(() => { setShowMessageBox(false); setMessage(''); }, 3000); }, []);
   const getFirstName = useCallback((fullName) => { if (!fullName) return ''; const parts = fullName.split(', '); return parts.length > 1 ? parts[1] : parts[0]; }, []);
@@ -104,42 +87,13 @@ const App = () => {
 
   useEffect(() => {
     if (!db || !nameInput) { setIsPinRegistered(false); return; }
-    const checkPin = async () => {
-      const publicDataPath = `/artifacts/${appId}/public/data`;
-      const pinDocRef = doc(db, `${publicDataPath}/studentPins`, nameInput);
-      const docSnap = await getDoc(pinDocRef);
-      setIsPinRegistered(docSnap.exists());
-    };
+    const checkPin = async () => { const publicDataPath = `/artifacts/${appId}/public/data`; const pinDocRef = doc(db, `${publicDataPath}/studentPins`, nameInput); const docSnap = await getDoc(pinDocRef); setIsPinRegistered(docSnap.exists()); };
     checkPin();
   }, [db, nameInput, appId]);
   
   const handleNameChange = (newName) => { setNameInput(newName); setIsAuthenticated(false); setPinInput(''); setPinConfirmationInput(''); };
-
-  const handlePinLogin = async () => {
-    if (!db || !nameInput) return showMessage("Please select your name first.");
-    const publicDataPath = `/artifacts/${appId}/public/data`;
-    const pinDocRef = doc(db, `${publicDataPath}/studentPins`, nameInput);
-    try {
-        const docSnap = await getDoc(pinDocRef);
-        if (docSnap.exists() && docSnap.data().pin === pinInput) { setIsAuthenticated(true); showMessage(`Welcome, ${getFirstName(nameInput)}!`); } 
-        else { showMessage("Incorrect PIN. Please try again."); }
-    } catch (e) { console.error(e); showMessage("Login error.");}
-    setPinInput('');
-  };
-
-  const handlePinRegister = async () => {
-    if (!db || !nameInput) return showMessage("Please select your name first.");
-    if (pinInput.length !== 4) return showMessage("PIN must be 4 digits.");
-    if (pinInput !== pinConfirmationInput) return showMessage("PINs do not match.");
-    const publicDataPath = `/artifacts/${appId}/public/data`;
-    const pinDocRef = doc(db, `${publicDataPath}/studentPins`, nameInput);
-    try {
-      await setDoc(pinDocRef, { pin: pinInput });
-      setIsAuthenticated(true);
-      showMessage(`PIN successfully registered! Welcome, ${getFirstName(nameInput)}!`);
-    } catch (e) { showMessage("Error registering PIN. Please try again."); console.error(e); }
-    setPinInput(''); setPinConfirmationInput('');
-  };
+  const handlePinLogin = async () => { if (!db || !nameInput) return showMessage("Please select your name first."); const publicDataPath = `/artifacts/${appId}/public/data`; const pinDocRef = doc(db, `${publicDataPath}/studentPins`, nameInput); try { const docSnap = await getDoc(pinDocRef); if (docSnap.exists() && docSnap.data().pin === pinInput) { setIsAuthenticated(true); showMessage(`Welcome, ${getFirstName(nameInput)}!`); } else { showMessage("Incorrect PIN. Please try again."); } } catch (e) { console.error(e); showMessage("Login error.");} setPinInput(''); };
+  const handlePinRegister = async () => { if (!db || !nameInput) return showMessage("Please select your name first."); if (pinInput.length !== 4) return showMessage("PIN must be 4 digits."); if (pinInput !== pinConfirmationInput) return showMessage("PINs do not match."); const publicDataPath = `/artifacts/${appId}/public/data`; const pinDocRef = doc(db, `${publicDataPath}/studentPins`, nameInput); try { await setDoc(pinDocRef, { pin: pinInput }); setIsAuthenticated(true); showMessage(`PIN successfully registered! Welcome, ${getFirstName(nameInput)}!`); } catch (e) { showMessage("Error registering PIN. Please try again."); console.error(e); } setPinInput(''); setPinConfirmationInput(''); };
 
   useEffect(() => { const checkTime = () => setIsClassActive(isWithinClassTime(selectedCourse)); checkTime(); const interval = setInterval(checkTime, 30000); return () => clearInterval(interval); }, [selectedCourse]);
   useEffect(() => { if (!isFirebaseConnected || !db) return; const publicDataPath = `/artifacts/${appId}/public/data`; const talentsQuery = query(collection(db, `${publicDataPath}/talents`), where("course", "==", selectedCourse)); const unsubTalents = onSnapshot(talentsQuery, (snap) => setTalentsLog(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })))); return () => unsubTalents(); }, [isFirebaseConnected, db, selectedCourse, appId]);
@@ -150,7 +104,10 @@ const App = () => {
     setAdminSelectedStudent(''); setAdminStudentLog([]); setGradedPosts(new Set());
     const questionsQuery = query(collection(db, `${publicDataPath}/questions`), where("course", "==", selectedCourse), where("date", "==", adminSelectedDate));
     const unsubQuestions = onSnapshot(questionsQuery, (snap) => setQuestionsLog(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
-    return () => unsubQuestions();
+    // --- FEATURE RESTORED: Fetch daily feedback log for admin ---
+    const feedbackQuery = query(collection(db, `${publicDataPath}/feedback`), where("course", "==", selectedCourse), where("date", "==", adminSelectedDate));
+    const unsubFeedback = onSnapshot(feedbackQuery, (snap) => setFeedbackLog(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a,b) => b.timestamp - a.timestamp)));
+    return () => { unsubQuestions(); unsubFeedback(); };
   }, [isFirebaseConnected, db, selectedCourse, adminSelectedDate, appId, isAdmin]);
 
   useEffect(() => {
@@ -163,7 +120,7 @@ const App = () => {
 
   useEffect(() => {
     if (!isFirebaseConnected || !db || isAdmin || !nameInput || !isAuthenticated) {
-       setStudentActivityLog([]); setMyTotalTalents(0); setTalentTransactions([]); setDailyProgress({ question_comment: 0, reasoning: 0 }); return;
+       setStudentActivityLog([]); setMyTotalTalents(0); setTalentTransactions([]); setDailyProgress({ question_comment: 0, reasoning: 0 }); setStudentFeedbackLog([]); return;
     }
     const publicDataPath = `/artifacts/${appId}/public/data`;
     const transactionsQuery = query(collection(db, `${publicDataPath}/talentTransactions`), where("name", "==", nameInput));
@@ -172,6 +129,7 @@ const App = () => {
     const unsubMyTalent = onSnapshot(talentDocRef, (doc) => { if (doc.exists()) { setMyTotalTalents(doc.data().totalTalents); } else { setMyTotalTalents(0); } });
 
     let unsubActivity = () => {};
+    let unsubFeedback = () => {};
     if (studentSelectedDate) {
       const activityQuery = query(collection(db, `${publicDataPath}/questions`), where("course", "==", selectedCourse), where("name", "==", nameInput), where("date", "==", studentSelectedDate));
       unsubActivity = onSnapshot(activityQuery, (snap) => {
@@ -181,9 +139,12 @@ const App = () => {
         const rCount = activities.filter(act => act.type === 'reasoning').length;
         setDailyProgress({ question_comment: qcCount, reasoning: rCount });
       });
-    } else { setStudentActivityLog([]); setDailyProgress({ question_comment: 0, reasoning: 0 }); }
+      // --- FEATURE RESTORED: Fetch student's own feedback log ---
+      const feedbackQuery = query(collection(db, `${publicDataPath}/feedback`), where("course", "==", selectedCourse), where("name", "==", nameInput), where("date", "==", studentSelectedDate));
+      unsubFeedback = onSnapshot(feedbackQuery, (snap) => setStudentFeedbackLog(snap.docs.map(doc => doc.data()).sort((a,b) => b.timestamp - a.timestamp)));
+    } else { setStudentActivityLog([]); setDailyProgress({ question_comment: 0, reasoning: 0 }); setStudentFeedbackLog([]); }
     
-    return () => { unsubActivity(); unsubMyTalent(); unsubTransactions(); };
+    return () => { unsubActivity(); unsubMyTalent(); unsubTransactions(); unsubFeedback(); };
   }, [isFirebaseConnected, db, selectedCourse, nameInput, studentSelectedDate, appId, isAdmin, isAuthenticated]);
 
   const modifyTalent = async (studentName, amount, type, logId) => {
@@ -215,23 +176,27 @@ const App = () => {
     } catch (e) { showMessage("Submission failed. ❌"); }
   };
 
+  // --- FEATURE RESTORED: Handler for feedback buttons ---
+  const handleFeedback = async (status) => {
+    if (!db || !nameInput.trim()) return showMessage("Please select your name first.");
+    setClickedButton(status);
+    setTimeout(() => setClickedButton(null), 1500);
+    try {
+      const publicDataPath = `/artifacts/${appId}/public/data`;
+      await addDoc(collection(db, `${publicDataPath}/feedback`), { name: nameInput, status, course: selectedCourse, date: new Date().toISOString().slice(0, 10), timestamp: serverTimestamp() });
+      showMessage("Feedback submitted!");
+    } catch (e) { showMessage("Failed to submit feedback."); }
+  };
+
   const handleAdminLogin = (password) => { if (password === ADMIN_PASSWORD) { setIsAdmin(true); showMessage("Admin Login successful! 🔑"); } else { showMessage("Incorrect password. 🚫"); } };
   const isNameEntered = nameInput.trim().length > 0;
   const isReadyToParticipate = isAuthenticated && isClassActive;
 
-  // --- FIX 2: Admin progress now shows all students ---
   const adminDailyProgress = useMemo(() => {
     const roster = COURSE_STUDENTS[selectedCourse] || [];
-    const initialProgress = roster.reduce((acc, studentName) => {
-        acc[studentName] = { question_comment: 0, reasoning: 0 };
-        return acc;
-    }, {});
-
+    const initialProgress = roster.reduce((acc, studentName) => { acc[studentName] = { question_comment: 0, reasoning: 0 }; return acc; }, {});
     questionsLog.forEach(log => {
-        if (initialProgress[log.name]) {
-            if (log.type === 'question_comment') initialProgress[log.name].question_comment++;
-            if (log.type === 'reasoning') initialProgress[log.name].reasoning++;
-        }
+        if (initialProgress[log.name]) { if (log.type === 'question_comment') initialProgress[log.name].question_comment++; if (log.type === 'reasoning') initialProgress[log.name].reasoning++; }
     });
     return initialProgress;
   }, [questionsLog, selectedCourse]);
@@ -257,9 +222,10 @@ const App = () => {
                 <h3 className="text-xl font-semibold mb-2">Daily Requirement Progress for {adminSelectedDate}</h3>
                 <ul className="space-y-1 text-sm h-40 overflow-y-auto">{Object.entries(adminDailyProgress).map(([name, progress]) => { const qcMet = progress.question_comment >= 2; const rMet = progress.reasoning >= 2; return ( <li key={name} className="flex justify-between items-center pr-2"> <span>{getFirstName(name)}:</span> <span> <span className={qcMet ? 'text-green-400' : 'text-red-400'}>{qcMet ? '✅' : '❌'} {progress.question_comment}/2 Q/C</span> / <span className={rMet ? 'text-green-400' : 'text-red-400'}>{rMet ? '✅' : '❌'} {progress.reasoning}/2 R</span> </span> </li> ); })}</ul>
               </div>
+               {/* --- FEATURE RESTORED: Admin daily feedback log --- */}
               <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
-                <h3 className="text-xl font-semibold">❓ Daily Posts</h3>
-                <ul>{questionsLog.map((log) => ( <li key={log.id} className="p-2 border-b border-slate-700 text-gray-300 flex justify-between items-center"> <span className="flex-1 mr-2">{log.name} [{log.type}]: {log.text}</span> <div className="flex items-center space-x-1"> {gradedPosts.has(log.id) && <span className="text-green-500 text-xl">✅</span>} <button onClick={() => modifyTalent(log.name, -1, 'penalty', log.id)} className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700 flex-shrink-0">-1</button> <button onClick={() => modifyTalent(log.name, 1, 'bonus', log.id)} className="px-2 py-1 bg-yellow-500 text-black text-xs font-bold rounded hover:bg-yellow-600 flex-shrink-0">+1</button> </div> </li> ))}</ul>
+                <h3 className="text-xl font-semibold">🚦 Daily Understanding Check</h3>
+                <ul className="h-24 overflow-y-auto">{feedbackLog.map((log) => ( <li key={log.id} className="p-2 border-b border-slate-700 text-gray-300"> ({log.timestamp?.toDate().toLocaleTimeString()}) {log.name}: {log.status}</li> ))}</ul>
               </div>
             </>
           )}
@@ -270,24 +236,24 @@ const App = () => {
           <h1 className="text-3xl font-bold text-center mb-1">Ahnstoppable Learning:<br /><span className="text-orange-500">Freely Ask, Freely Learn</span></h1>
           <div className="flex flex-wrap justify-center gap-2 my-6"> {COURSES.map((course) => <button key={course} onClick={() => { setSelectedCourse(course); handleNameChange(''); }} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)} </div>
           <select value={nameInput} onChange={(e) => handleNameChange(e.target.value)} disabled={isAuthenticated} className="p-3 mb-2 w-full border bg-slate-700 border-slate-500 rounded-lg text-lg disabled:opacity-50"> <option value="">Select your name...</option> {COURSE_STUDENTS[selectedCourse].map((name, i) => <option key={i} value={name}>{name}</option>)} </select>
-          
-          {isNameEntered && !isAuthenticated && (
-            isPinRegistered ? (
-              <div className="my-4 p-4 bg-slate-700 rounded-lg animate-fade-in"> <p className="text-center text-white mb-2 font-semibold">Enter your 4-digit PIN.</p> <div className="flex space-x-2"> <input type="password" inputMode="numeric" maxLength="4" value={pinInput} onChange={(e) => setPinInput(e.target.value)} className="flex-1 p-3 border bg-slate-600 border-slate-500 rounded-lg text-lg text-center"/> <button onClick={handlePinLogin} className="p-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold">Login</button> </div> </div>
-            ) : (
-              <div className="my-4 p-4 bg-slate-700 rounded-lg animate-fade-in"> <p className="text-center text-white mb-2 font-semibold">First time? Create your 4-digit PIN.<br/><span className="text-sm font-normal">(Use the last 4 digits of your Student ID)</span></p> <div className="space-y-2"> <input type="password" inputMode="numeric" maxLength="4" value={pinInput} onChange={(e) => setPinInput(e.target.value)} placeholder="Create 4-digit PIN" className="w-full p-3 border bg-slate-600 border-slate-500 rounded-lg text-lg text-center"/> <input type="password" inputMode="numeric" maxLength="4" value={pinConfirmationInput} onChange={(e) => setPinConfirmationInput(e.target.value)} placeholder="Confirm PIN" className="w-full p-3 border bg-slate-600 border-slate-500 rounded-lg text-lg text-center"/> <button onClick={handlePinRegister} className="w-full p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-bold">Register & Start</button> </div> </div>
-            )
-          )}
+          {isNameEntered && !isAuthenticated && ( isPinRegistered ? ( <div className="my-4 p-4 bg-slate-700 rounded-lg animate-fade-in"> <p className="text-center text-white mb-2 font-semibold">Enter your 4-digit PIN.</p> <div className="flex space-x-2"> <input type="password" inputMode="numeric" maxLength="4" value={pinInput} onChange={(e) => setPinInput(e.target.value)} className="flex-1 p-3 border bg-slate-600 border-slate-500 rounded-lg text-lg text-center"/> <button onClick={handlePinLogin} className="p-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold">Login</button> </div> </div> ) : ( <div className="my-4 p-4 bg-slate-700 rounded-lg animate-fade-in"> <p className="text-center text-white mb-2 font-semibold">First time? Create your 4-digit PIN.<br/><span className="text-sm font-normal">(Use the last 4 digits of your Student ID)</span></p> <div className="space-y-2"> <input type="password" inputMode="numeric" maxLength="4" value={pinInput} onChange={(e) => setPinInput(e.target.value)} placeholder="Create 4-digit PIN" className="w-full p-3 border bg-slate-600 border-slate-500 rounded-lg text-lg text-center"/> <input type="password" inputMode="numeric" maxLength="4" value={pinConfirmationInput} onChange={(e) => setPinConfirmationInput(e.target.value)} placeholder="Confirm PIN" className="w-full p-3 border bg-slate-600 border-slate-500 rounded-lg text-lg text-center"/> <button onClick={handlePinRegister} className="w-full p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-bold">Register & Start</button> </div> </div> ) )}
 
           {isAuthenticated && (
             <div className="mt-4 animate-fade-in">
               <div className="flex justify-center items-center space-x-2 my-4"> <label className="text-gray-300 text-lg">View My Posts for Date:</label> <input type="date" value={studentSelectedDate} onChange={(e) => setStudentSelectedDate(e.target.value)} className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-lg"/> </div>
+              {/* --- FEATURE RESTORED: Understanding Check UI --- */}
+              <div className={`p-4 border border-slate-600 rounded-xl mb-6 ${!isReadyToParticipate ? 'opacity-50 pointer-events-none' : ''}`}>
+                <p className="text-xl font-medium text-center text-gray-200">Understanding Check</p>
+                <div className="flex justify-center space-x-4 mt-2">
+                  <button onClick={() => handleFeedback('Not Understood 🙁')} className={`p-4 w-16 h-16 rounded-full bg-red-500 flex justify-center items-center text-2xl ${clickedButton === 'Not Understood 🙁' ? 'ring-4 ring-orange-500' : ''}`}>🙁</button>
+                  <button onClick={() => handleFeedback('Confused 🤔')} className={`p-4 w-16 h-16 rounded-full bg-yellow-400 flex justify-center items-center text-2xl ${clickedButton === 'Confused 🤔' ? 'ring-4 ring-orange-500' : ''}`}>🤔</button>
+                  <button onClick={() => handleFeedback('Got It! ✅')} className={`p-4 w-16 h-16 rounded-full bg-green-500 flex justify-center items-center text-2xl ${clickedButton === 'Got It! ✅' ? 'ring-4 ring-orange-500' : ''}`}>✅</button>
+                </div>
+              </div>
+
               <div className="text-center p-3 bg-slate-700 text-white rounded-lg mb-4">
                   <p className="font-bold">Daily Requirement: 4 Talents (2 Q/C + 2 Reasoning)</p>
-                  <p className="text-sm">Today's Progress: 
-                      <span className={`mx-1 ${dailyProgress.question_comment >= 2 ? 'text-green-400' : 'text-red-400'}`}>[{dailyProgress.question_comment}/2 Q/C]</span>
-                      <span className={`mx-1 ${dailyProgress.reasoning >= 2 ? 'text-green-400' : 'text-red-400'}`}>[{dailyProgress.reasoning}/2 Reasoning]</span>
-                  </p>
+                  <p className="text-sm">Today's Progress: <span className={`mx-1 ${dailyProgress.question_comment >= 2 ? 'text-green-400' : 'text-red-400'}`}>[{dailyProgress.question_comment}/2 Q/C]</span> <span className={`mx-1 ${dailyProgress.reasoning >= 2 ? 'text-green-400' : 'text-red-400'}`}>[{dailyProgress.reasoning}/2 Reasoning]</span></p>
               </div>
               {!isClassActive && <div className="text-center p-3 bg-red-800 text-white rounded-lg mb-4"><p>You can only submit responses during class time.</p></div>}
               <div className={`p-4 border border-slate-600 rounded-xl mb-6 ${!isReadyToParticipate ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -300,7 +266,12 @@ const App = () => {
                 <h3 className="text-xl font-semibold text-gray-100 mb-2">My Talent History</h3>
                 <ul className="text-sm space-y-1">{talentTransactions.map((log, i) => ( <li key={i} className={`p-1 flex justify-between items-center ${log.points > 0 ? 'text-green-400' : 'text-red-400'}`}> <span><span className="font-bold">{log.points > 0 ? `+${log.points}` : log.points}</span>: {log.type}</span> <span className="text-xs text-gray-500">({log.timestamp?.toDate().toLocaleDateString()})</span> </li> ))}</ul>
               </div>
-              {studentSelectedDate && <div className="text-left p-4 border border-slate-600 rounded-xl mt-6"> <h3 className="text-xl font-semibold">My Posts for {studentSelectedDate}</h3> <ul>{studentActivityLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">[{log.type}]: {log.text}</li>)}</ul> </div> }
+              {studentSelectedDate && <div className="text-left p-4 border border-slate-600 rounded-xl mt-6"> <h3 className="text-xl font-semibold">Logs for {studentSelectedDate}</h3> 
+                <h4 className="font-semibold mt-2 text-gray-300">🚦 My Understanding Checks</h4>
+                <ul>{studentFeedbackLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">({log.timestamp?.toDate().toLocaleTimeString()}): {log.status}</li>)}</ul>
+                <h4 className="font-semibold mt-4 text-gray-300">✍️ My Posts</h4>
+                <ul>{studentActivityLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">[{log.type}]: {log.text}</li>)}</ul> 
+              </div> }
               <div className="text-left p-4 border border-slate-600 rounded-xl mt-6"> <h3 className="text-xl font-semibold text-gray-100 mb-4">Class Score Range</h3> <TalentGraph talents={talentsLog} type="student" getFirstName={getFirstName} /> </div>
             </div>
           )}
