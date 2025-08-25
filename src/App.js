@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
-import { getFirestore, collection, query, where, addDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, collection, query, where, addDoc, onSnapshot, serverTimestamp, doc, setDoc, getDoc, increment } from 'firebase/firestore';
 
 // Define the courses and a hardcoded list of students for each course.
 const COURSES = ["ADV 375-01", "ADV 375-02", "ADV 461"];
@@ -44,6 +44,9 @@ const App = () => {
   const [adminPassword, setAdminPassword] = useState('');
   const ADMIN_PASSWORD = '0811';
 
+  const [talentsLog, setTalentsLog] = useState([]);
+  const [myTotalTalents, setMyTotalTalents] = useState(0);
+  
   const showMessage = useCallback((msg) => {
     setMessage(msg);
     setShowMessageBox(true);
@@ -90,27 +93,38 @@ const App = () => {
     const publicDataPath = `/artifacts/${appId}/public/data`;
     const feedbackQuery = query(collection(db, `${publicDataPath}/feedback`), where("course", "==", selectedCourse), where("date", "==", selectedDate));
     const questionsQuery = query(collection(db, `${publicDataPath}/questions`), where("course", "==", selectedCourse), where("date", "==", selectedDate));
+    const talentsQuery = query(collection(db, `${publicDataPath}/talents`), where("course", "==", selectedCourse));
 
     const unsubFeedback = onSnapshot(feedbackQuery, (snap) => setFeedbackLog(snap.docs.map(doc => doc.data()).sort((a, b) => b.timestamp - a.timestamp)));
     const unsubQuestions = onSnapshot(questionsQuery, (snap) => setQuestionsLog(snap.docs.map(doc => doc.data()).sort((a, b) => b.timestamp - a.timestamp)));
+    const unsubTalents = onSnapshot(talentsQuery, (snap) => setTalentsLog(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => b.totalTalents - a.totalTalents)));
 
-    return () => { unsubFeedback(); unsubQuestions(); };
+    return () => { unsubFeedback(); unsubQuestions(); unsubTalents(); };
   }, [isFirebaseConnected, db, selectedCourse, selectedDate, appId, isAdmin]);
 
   useEffect(() => {
     if (!isFirebaseConnected || !db || isAdmin || !nameInput) {
       setFeedbackLog([]);
       setQuestionsLog([]);
+      setMyTotalTalents(0);
       return;
     }
     const publicDataPath = `/artifacts/${appId}/public/data`;
     const feedbackQuery = query(collection(db, `${publicDataPath}/feedback`), where("course", "==", selectedCourse), where("name", "==", nameInput));
     const questionsQuery = query(collection(db, `${publicDataPath}/questions`), where("course", "==", selectedCourse), where("name", "==", nameInput));
+    const talentDocRef = doc(db, `${publicDataPath}/talents`, nameInput);
 
     const unsubFeedback = onSnapshot(feedbackQuery, (snap) => setFeedbackLog(snap.docs.map(doc => doc.data()).sort((a, b) => b.timestamp - a.timestamp)));
     const unsubQuestions = onSnapshot(questionsQuery, (snap) => setQuestionsLog(snap.docs.map(doc => doc.data()).sort((a, b) => b.timestamp - a.timestamp)));
+    const unsubMyTalent = onSnapshot(talentDocRef, (doc) => {
+        if (doc.exists()) {
+            setMyTotalTalents(doc.data().totalTalents);
+        } else {
+            setMyTotalTalents(0);
+        }
+    });
     
-    return () => { unsubFeedback(); unsubQuestions(); };
+    return () => { unsubFeedback(); unsubQuestions(); unsubMyTalent(); };
   }, [isFirebaseConnected, db, selectedCourse, nameInput, appId, isAdmin]);
 
   const handleFeedback = async (status) => {
@@ -148,6 +162,25 @@ const App = () => {
     }
   };
 
+  const handleGiveTalent = async (studentName) => {
+    if (!db) return showMessage("DB connection issue.");
+    const publicDataPath = `/artifacts/${appId}/public/data`;
+    const talentDocRef = doc(db, `${publicDataPath}/talents`, studentName);
+    
+    try {
+        const docSnap = await getDoc(talentDocRef);
+        if (docSnap.exists()) {
+            await setDoc(talentDocRef, { totalTalents: increment(1) }, { merge: true });
+        } else {
+            await setDoc(talentDocRef, { name: studentName, course: selectedCourse, totalTalents: 1 });
+        }
+        showMessage(`${getFirstName(studentName)} received +1 Talent! ✨`);
+    } catch(e) {
+        console.error("Error giving talent: ", e);
+        showMessage("Failed to give talent.");
+    }
+  };
+
   const handleAdminLogin = () => {
     if (adminPassword === ADMIN_PASSWORD) {
       setIsAdmin(true);
@@ -174,13 +207,37 @@ const App = () => {
             {COURSES.map((course) => <button key={course} onClick={() => setSelectedCourse(course)} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)}
           </div>
           <h2 className="text-2xl font-semibold mb-4 text-center text-gray-200">{selectedDate} - {selectedCourse} Data</h2>
+          
+          <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
+            <h3 className="text-xl font-semibold text-gray-100">❓ Questions/Comments Log</h3>
+            <ul>{questionsLog.map((log, i) => (
+              <li key={i} className="p-2 border-b border-slate-700 text-gray-300 flex justify-between items-center">
+                <span>{log.name} [{log.type}]: {log.text}</span>
+                {/* --- CHANGE: Translated button text --- */}
+                <button onClick={() => handleGiveTalent(log.name)} className="ml-4 px-2 py-1 bg-yellow-500 text-black text-xs font-bold rounded hover:bg-yellow-600 flex-shrink-0">
+                  +1 Talent
+                </button>
+              </li>
+            ))}</ul>
+          </div>
+
+          <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
+            <h3 className="text-xl font-semibold text-gray-100">🏆 Talent Leaderboard ({selectedCourse})</h3>
+            <ul>{talentsLog.map((talent) => (
+              <li key={talent.id} className="p-2 border-b border-slate-700 text-gray-300 flex items-center">
+                <span>{talent.name}:</span>
+                {/* --- CHANGE: Added Talent coin image --- */}
+                <span className="font-bold text-yellow-400 ml-2 flex items-center">
+                  {talent.totalTalents}
+                  <img src="/talent-coin.png" alt="Talent coin" className="w-5 h-5 ml-1" />
+                </span>
+              </li>
+            ))}</ul>
+          </div>
+          
           <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
             <h3 className="text-xl font-semibold text-gray-100">📊 Understanding Log</h3>
             <ul>{feedbackLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">{log.name} ({log.timestamp?.toDate().toLocaleTimeString()}): {log.status}</li>)}</ul>
-          </div>
-          <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
-            <h3 className="text-xl font-semibold text-gray-100">❓ Questions/Comments Log</h3>
-            <ul>{questionsLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">{log.name} [{log.type}]: {log.text}</li>)}</ul>
           </div>
         </>
       ) : (
@@ -197,7 +254,16 @@ const App = () => {
               {COURSE_STUDENTS[selectedCourse].map((name, i) => <option key={i} value={name}>{name}</option>)}
             </select>
             <p className="text-center text-sm text-gray-400 mt-2">{isNameEntered && isFirebaseConnected ? <span className="text-orange-500 font-bold">Hello, {getFirstName(nameInput)}!</span> : <span>Select your name to enable features.</span>}{!isFirebaseConnected && <span className="block text-red-500 font-bold mt-2">🚫 DB connection failed.</span>}</p>
+            
+            {/* --- CHANGE: Added Talent coin image --- */}
+            {isNameEntered && isFirebaseConnected && (
+                <div className="flex justify-center items-center text-center mt-4 p-3 bg-yellow-400 text-black rounded-lg">
+                    <img src="/talent-coin.png" alt="Talent coin" className="w-6 h-6 mr-2" />
+                    <p className="font-bold text-lg">My Total Talents: {myTotalTalents}</p>
+                </div>
+            )}
           </div>
+          
           <div className={`text-center mb-8 ${!isNameEntered || !isFirebaseConnected ? 'opacity-50' : ''}`}>
             <p className="text-xl font-medium text-gray-200">Understanding Check</p>
             <div className="flex justify-center space-x-4 mt-2">
@@ -229,9 +295,7 @@ const App = () => {
 
   return (
     <div className="relative min-h-screen w-full bg-custom-beige-bg flex items-center justify-center p-4 overflow-hidden">
-      {/* --- START: Large Scrapbook Background --- */}
       <div className="absolute inset-0 w-full h-full overflow-hidden">
-        {/* Photos (Larger sizes and re-positioned) */}
         <img src="/photo1.jpg" alt="Collage 1" className="absolute top-[2%] left-[-5%] w-96 rounded-lg shadow-2xl transform -rotate-12 z-10" />
         <img src="/photo2.jpg" alt="Collage 2" className="absolute top-[5%] right-[-2%] w-[28rem] rounded-lg shadow-2xl transform rotate-6 z-10" />
         <img src="/photo3.jpg" alt="Collage 3" className="absolute bottom-[15%] left-[10%] w-80 rounded-lg shadow-2xl transform rotate-3 z-10" />
@@ -247,13 +311,11 @@ const App = () => {
         <img src="/photo13.jpg" alt="Collage 13" className="absolute top-[65%] right-[35%] w-96 rounded-lg shadow-2xl transform -rotate-4 z-10" />
         <img src="/photo14.jpg" alt="Collage 14" className="absolute top-[40%] left-[-10%] w-[26rem] rounded-lg shadow-2xl transform -rotate-12 z-10" />
       </div>
-      {/* --- END: Scrapbook Background --- */}
       
       <div className="relative z-20">
         <MainContent />
       </div>
       
-      {/* Message Box */}
       {showMessageBox && (
         <div className="fixed top-1/2 left-1/2 -translate-x-1-2 -translate-y-1-2 bg-gray-900 text-white p-6 rounded-xl text-center z-50">
           {message}
