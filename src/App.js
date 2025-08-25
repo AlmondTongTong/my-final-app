@@ -1,21 +1,27 @@
-// This is a final test comment to force an update./* global __app_id, __initial_auth_token */
+/* global __app_id, __initial_auth_token */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore, collection, query, where, addDoc, onSnapshot, serverTimestamp, doc, setDoc, getDoc, increment } from 'firebase/firestore';
 
-// To fix the laggy typing, we create smaller components for the forms.
-// This prevents the whole page from re-rendering on every keystroke.
+// --- FIX: Re-added the missing constant variables ---
+const COURSES = ["ADV 375-01", "ADV 375-02", "ADV 461"];
+const COURSE_STUDENTS = {
+  "ADV 375-01": [ "Donovan, Robert", "Ellison, Alexis", "Futrell, Rylie", "George, Matthew", "Hammer, Olivia", "Kobayashi, Sena", "Lee, Byungho", "Mady, Gabriella", "Mawuenyega, Chloe", "Oved, Liam", "Sims, Ava", "Soke, Duru", "Walsh, William", "Warmington, Charles", "Yu, Wenbo" ],
+  "ADV 375-02": [ "Alteio, Katherine", "Asatryan, Natalie", "Bondi, Ava", "Brown, Kylie", "Calabrese, Ella", "Dougherty, Quinn", "Dutton, Madeline", "Grabinger, Katharina", "Ju, Ashley", "Lahanas, Dean", "Lange, Bella-Soleil", "McQuilling, Louisa", "Milliman, Nicole", "Nizdil, Kennedy", "Salahieh, Zayd", "Shannon, Savannah", "Tang, Yuhan", "Walz, Lucy", "Wang, Michelle", "Wanke, Karsten" ],
+  "ADV 461": [ "Bonk, Maya", "Burrow, Elizabeth", "Campos, Victoria", "Cantada, Cristian", "Chong, Timothy", "Chung, Sooa", "Cwiertnia, Zachary", "Fernandez, Francisco", "Fok, Alexis", "Gilbert, Jasmine", "Hall, Lily", "Hosea, Nicholas", "Jang, Da Eun", "Kim, Lynn", "Kim, Noelle", "Koning, William", "Lee, Edmund", "Lewandowski, Luke", "Leyson, Noah", "Lopez, Tatum", "Murphy, Alexander", "Swendsen, Katherine" ],
+};
+// ----------------------------------------------------
 
-// --- NEW COMPONENT 1: Input form for Questions and Comments ---
+// To fix the laggy typing, we create smaller components for the forms.
 const ContentForm = ({ type, onAddContent, isEnabled }) => {
   const [text, setText] = useState('');
 
   const handleSubmit = (event) => {
     event.preventDefault();
     onAddContent(text, type);
-    setText(''); // Clear input after submission
+    setText('');
   };
 
   return (
@@ -39,7 +45,6 @@ const ContentForm = ({ type, onAddContent, isEnabled }) => {
   );
 };
 
-// --- NEW COMPONENT 2: Input form for Admin Login ---
 const AdminLoginForm = ({ onAdminLogin }) => {
     const [password, setPassword] = useState('');
 
@@ -231,7 +236,7 @@ const App = () => {
             <input type="date" value={adminSelectedDate} onChange={(e) => setAdminSelectedDate(e.target.value)} className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-lg"/>
           </div>
           <div className="flex flex-wrap justify-center gap-2 mb-6">
-            {["ADV 375-01", "ADV 375-02", "ADV 461"].map((course) => <button key={course} onClick={() => setSelectedCourse(course)} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)}
+            {COURSES.map((course) => <button key={course} onClick={() => setSelectedCourse(course)} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)}
           </div>
           <h2 className="text-2xl font-semibold mb-4 text-center text-gray-200">{adminSelectedDate} - {selectedCourse} Data</h2>
           
@@ -270,7 +275,7 @@ const App = () => {
           <h1 className="text-3xl font-bold text-center mb-1">Ahnstoppable Learning:<br /><span className="text-orange-500">Freely Ask, Freely Learn</span></h1>
           <div className="flex justify-center space-x-2 my-2 text-3xl"><span>😁</span><span>😀</span><span>😁</span></div>
           <div className="flex flex-wrap justify-center gap-2 mb-6 mt-4">
-             {["ADV 375-01", "ADV 375-02", "ADV 461"].map((course) => <button key={course} onClick={() => { setSelectedCourse(course); setNameInput(''); }} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)}
+             {COURSES.map((course) => <button key={course} onClick={() => { setSelectedCourse(course); setNameInput(''); }} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)}
           </div>
           <h2 className="text-2xl font-semibold mb-4 text-center text-gray-200">{selectedCourse}</h2>
           <div className="mb-6">
