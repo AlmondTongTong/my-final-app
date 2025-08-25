@@ -97,7 +97,6 @@ const App = () => {
   const ADMIN_PASSWORD = '0811';
   
   const [adminSelectedDate, setAdminSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
-  // --- FIX: Removed the unused studentSelectedDate state variable ---
   const [talentsLog, setTalentsLog] = useState([]);
   const [myTotalTalents, setMyTotalTalents] = useState(0);
 
@@ -211,14 +210,18 @@ const App = () => {
     } catch (e) { showMessage("Submission failed. ❌"); }
   };
 
+  // --- BUG FIX: Switched to a more robust manual increment logic ---
   const handleGiveTalent = async (studentName) => {
     const publicDataPath = `/artifacts/${appId}/public/data`;
     const talentDocRef = doc(db, `${publicDataPath}/talents`, studentName);
     try {
         const docSnap = await getDoc(talentDocRef);
         if (docSnap.exists()) {
-            await updateDoc(talentDocRef, { totalTalents: increment(1) });
+            // If the document exists, read the current value and add 1
+            const currentTalents = docSnap.data().totalTalents || 0;
+            await updateDoc(talentDocRef, { totalTalents: currentTalents + 1 });
         } else {
+            // If it's the first talent, create the document with a value of 1
             await setDoc(talentDocRef, { name: studentName, course: selectedCourse, totalTalents: 1 });
         }
         showMessage(`${getFirstName(studentName)} received +1 Talent! ✨`);
