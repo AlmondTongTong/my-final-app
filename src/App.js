@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
-import { getFirestore, collection, query, where, addDoc, onSnapshot, serverTimestamp, doc, setDoc, getDoc, increment } from 'firebase/firestore';
+// --- FIX: Import `updateDoc` which is needed for incrementing ---
+import { getFirestore, collection, query, where, addDoc, onSnapshot, serverTimestamp, doc, setDoc, getDoc, increment, updateDoc } from 'firebase/firestore';
 
 const COURSES = ["ADV 375-01", "ADV 375-02", "ADV 461"];
 const COURSE_STUDENTS = {
@@ -24,22 +25,22 @@ const isWithinClassTime = (courseName) => {
     switch(courseName) {
         case "ADV 375-01":
             if (day === 1 || day === 4) { // Monday or Thursday
-                const startTime = 8 * 60; // 8:00 AM
-                const endTime = 9 * 60 + 50; // 9:50 AM
+                const startTime = 8 * 60;
+                const endTime = 9 * 60 + 50;
                 return currentTimeInMinutes >= startTime && currentTimeInMinutes <= endTime;
             }
             return false;
         case "ADV 375-02":
             if (day === 1 || day === 4) { // Monday or Thursday
-                const startTime = 12 * 60; // 12:00 PM
-                const endTime = 13 * 60 + 50; // 1:50 PM
+                const startTime = 12 * 60;
+                const endTime = 13 * 60 + 50;
                 return currentTimeInMinutes >= startTime && currentTimeInMinutes <= endTime;
             }
             return false;
         case "ADV 461":
             if (day === 3) { // Wednesday
-                const startTime = 12 * 60; // 12:00 PM
-                const endTime = 15 * 60 + 50; // 3:50 PM
+                const startTime = 12 * 60;
+                const endTime = 15 * 60 + 50;
                 return currentTimeInMinutes >= startTime && currentTimeInMinutes <= endTime;
             }
             return false;
@@ -97,7 +98,7 @@ const App = () => {
   const ADMIN_PASSWORD = '0811';
   
   const [adminSelectedDate, setAdminSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [studentSelectedDate, setStudentSelectedDate] = useState(''); // --- CHANGE: Start with no date selected ---
+  const [studentSelectedDate, setStudentSelectedDate] = useState('');
   const [talentsLog, setTalentsLog] = useState([]);
   const [myTotalTalents, setMyTotalTalents] = useState(0);
 
@@ -179,28 +180,19 @@ const App = () => {
       return;
     }
     const publicDataPath = `/artifacts/${appId}/public/data`;
-    // Only query for logs if a date has been selected
-    let unsubFeedback = () => {};
-    let unsubQuestions = () => {};
-
-    if (studentSelectedDate) {
-        const feedbackQuery = query(collection(db, `${publicDataPath}/feedback`), where("course", "==", selectedCourse), where("name", "==", nameInput), where("date", "==", studentSelectedDate));
-        const questionsQuery = query(collection(db, `${publicDataPath}/questions`), where("course", "==", selectedCourse), where("name", "==", nameInput), where("date", "==", studentSelectedDate));
-        unsubFeedback = onSnapshot(feedbackQuery, (snap) => setFeedbackLog(snap.docs.map(doc => doc.data()).sort((a,b) => b.timestamp - a.timestamp)));
-        unsubQuestions = onSnapshot(questionsQuery, (snap) => setQuestionsLog(snap.docs.map(doc => doc.data()).sort((a,b) => b.timestamp - a.timestamp)));
-    } else {
-        // If no date is selected, clear the logs
-        setFeedbackLog([]);
-        setQuestionsLog([]);
-    }
-
+    // Student now sees ALL their logs, not filtered by date.
+    const feedbackQuery = query(collection(db, `${publicDataPath}/feedback`), where("course", "==", selectedCourse), where("name", "==", nameInput));
+    const questionsQuery = query(collection(db, `${publicDataPath}/questions`), where("course", "==", selectedCourse), where("name", "==", nameInput));
     const talentDocRef = doc(db, `${publicDataPath}/talents`, nameInput);
+
+    const unsubFeedback = onSnapshot(feedbackQuery, (snap) => setFeedbackLog(snap.docs.map(doc => doc.data()).sort((a,b) => b.timestamp - a.timestamp)));
+    const unsubQuestions = onSnapshot(questionsQuery, (snap) => setQuestionsLog(snap.docs.map(doc => doc.data()).sort((a,b) => b.timestamp - a.timestamp)));
     const unsubMyTalent = onSnapshot(talentDocRef, (doc) => {
         if (doc.exists()) { setMyTotalTalents(doc.data().totalTalents); } else { setMyTotalTalents(0); }
     });
     
     return () => { unsubFeedback(); unsubQuestions(); unsubMyTalent(); };
-  }, [isFirebaseConnected, db, selectedCourse, nameInput, studentSelectedDate, appId, isAdmin]);
+  }, [isFirebaseConnected, db, selectedCourse, nameInput, appId, isAdmin]);
 
   const handleFeedback = async (status) => {
     if (!nameInput.trim()) return showMessage("Please select your name first.");
@@ -227,12 +219,17 @@ const App = () => {
     try {
         const docSnap = await getDoc(talentDocRef);
         if (docSnap.exists()) {
-            await setDoc(talentDocRef, { totalTalents: increment(1) }, { merge: true });
+            // --- FIX: Use `updateDoc` to correctly increment the value ---
+            await updateDoc(talentDocRef, { totalTalents: increment(1) });
         } else {
+            // This part for creating a new document is correct
             await setDoc(talentDocRef, { name: studentName, course: selectedCourse, totalTalents: 1 });
         }
         showMessage(`${getFirstName(studentName)} received +1 Talent! ✨`);
-    } catch(e) { showMessage("Failed to give talent."); }
+    } catch(e) { 
+        console.error("Error giving talent: ", e);
+        showMessage("Failed to give talent."); 
+    }
   };
 
   const handleAdminLogin = (password) => {
@@ -241,8 +238,8 @@ const App = () => {
   };
   
   const isNameEntered = nameInput.trim().length > 0;
-  // --- CHANGE: New condition to check if date is also selected ---
-  const isReadyToParticipate = isNameEntered && !!studentSelectedDate;
+  // Student can only participate if they have selected a name and it's during class time.
+  const isReadyToParticipate = isNameEntered && isClassActive;
 
   const MainContent = () => (
     <div className="w-full max-w-lg p-6 bg-slate-800 text-white rounded-xl shadow-lg box-shadow-custom">
@@ -308,40 +305,33 @@ const App = () => {
           <h1 className="text-3xl font-bold text-center mb-1">Ahnstoppable Learning:<br /><span className="text-orange-500">Freely Ask, Freely Learn</span></h1>
           <div className="flex justify-center space-x-2 my-2 text-3xl"><span>😁</span><span>😀</span><span>😁</span></div>
           <div className="flex flex-wrap justify-center gap-2 mb-6 mt-4">
-             {COURSES.map((course) => <button key={course} onClick={() => { setSelectedCourse(course); setNameInput(''); setStudentSelectedDate('') }} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)}
+             {COURSES.map((course) => <button key={course} onClick={() => { setSelectedCourse(course); setNameInput(''); }} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)}
           </div>
           <h2 className="text-2xl font-semibold mb-4 text-center text-gray-200">{selectedCourse}</h2>
           <div className="mb-6">
-            <select value={nameInput} onChange={(e) => {setNameInput(e.target.value); setStudentSelectedDate('');}} disabled={!isFirebaseConnected} className="p-3 w-full border bg-slate-700 border-slate-500 rounded-lg text-lg">
+            <select value={nameInput} onChange={(e) => {setNameInput(e.target.value);}} disabled={!isFirebaseConnected} className="p-3 w-full border bg-slate-700 border-slate-500 rounded-lg text-lg">
               <option value="">Select your name...</option>
               {COURSE_STUDENTS[selectedCourse].map((name, i) => <option key={i} value={name}>{name}</option>)}
             </select>
             <p className="text-center text-sm text-gray-400 mt-2">{isNameEntered && isFirebaseConnected ? <span className="text-orange-500 font-bold">Hello, {getFirstName(nameInput)}!</span> : <span>Select your name to enable features.</span>}{!isFirebaseConnected && <span className="block text-red-500 font-bold mt-2">🚫 DB connection failed.</span>}</p>
           </div>
-
+          
+          {!isClassActive && isNameEntered && <div className="text-center p-3 bg-red-800 text-white rounded-lg mb-4"><p>You can only submit responses during class time.</p></div>}
+          
           <div className={`${!isNameEntered || !isFirebaseConnected ? 'opacity-50 pointer-events-none' : ''}`}>
-            <div className="flex justify-center items-center space-x-2 my-4">
-              <label className="text-gray-300 text-lg">Select Class Date:</label>
-              <input type="date" value={studentSelectedDate} onChange={(e) => setStudentSelectedDate(e.target.value)} className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-lg"/>
+            <div className={`text-center mb-8 ${!isReadyToParticipate ? 'opacity-50 pointer-events-none' : ''}`}>
+              <p className="text-xl font-medium text-gray-200">Understanding Check</p>
+              <div className="flex justify-center space-x-4 mt-2">
+                <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Not Understood 🙁')} className={`p-4 w-12 h-12 rounded-full bg-red-500 ${clickedButton === 'Not Understood 🙁' ? 'ring-4 ring-orange-500' : ''}`}><span className="text-sm"></span></button><span className="text-sm">Not Understood</span></div>
+                <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Confused 🤔')} className={`p-4 w-12 h-12 rounded-full bg-yellow-400 ${clickedButton === 'Confused 🤔' ? 'ring-4 ring-orange-500' : ''}`}><span className="text-sm"></span></button><span className="text-sm">Confused</span></div>
+                <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Got It! ✅')} className={`p-4 w-12 h-12 rounded-full bg-green-500 ${clickedButton === 'Got It! ✅' ? 'ring-4 ring-orange-500' : ''}`}><span className="text-sm"></span></button><span className="text-sm">Got It!</span></div>
+              </div>
             </div>
-            
-            {!isClassActive && isReadyToParticipate && <div className="text-center p-3 bg-red-800 text-white rounded-lg mb-4"><p>You can only submit responses during class time.</p></div>}
-            
-            <div className={`${!isReadyToParticipate || !isClassActive ? 'opacity-50 pointer-events-none' : ''}`}>
-              <div className="text-center mb-8">
-                <p className="text-xl font-medium text-gray-200">Understanding Check</p>
-                <div className="flex justify-center space-x-4 mt-2">
-                  <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Not Understood 🙁')} className={`p-4 w-12 h-12 rounded-full bg-red-500 ${clickedButton === 'Not Understood 🙁' ? 'ring-4 ring-orange-500' : ''}`}><span className="text-sm"></span></button><span className="text-sm">Not Understood</span></div>
-                  <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Confused 🤔')} className={`p-4 w-12 h-12 rounded-full bg-yellow-400 ${clickedButton === 'Confused 🤔' ? 'ring-4 ring-orange-500' : ''}`}><span className="text-sm"></span></button><span className="text-sm">Confused</span></div>
-                  <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Got It! ✅')} className={`p-4 w-12 h-12 rounded-full bg-green-500 ${clickedButton === 'Got It! ✅' ? 'ring-4 ring-orange-500' : ''}`}><span className="text-sm"></span></button><span className="text-sm">Got It!</span></div>
-                </div>
-              </div>
-              <div className="space-y-4 mb-6">
-                <p className="text-lg font-medium text-gray-200">Leave a Question or Comment</p>
-                <ContentForm type="question" onAddContent={handleAddContent} isEnabled={isReadyToParticipate && isClassActive} />
-                <p className="text-base font-semibold mt-4 text-gray-200">What do you think? 🤔</p>
-                <ContentForm type="comment" onAddContent={handleAddContent} isEnabled={isReadyToParticipate && isClassActive} />
-              </div>
+            <div className={`space-y-4 mb-6 ${!isReadyToParticipate ? 'opacity-50 pointer-events-none' : ''}`}>
+              <p className="text-lg font-medium text-gray-200">Leave a Question or Comment</p>
+              <ContentForm type="question" onAddContent={handleAddContent} isEnabled={isReadyToParticipate} />
+              <p className="text-base font-semibold mt-4 text-gray-200">What do you think? 🤔</p>
+              <ContentForm type="comment" onAddContent={handleAddContent} isEnabled={isReadyToParticipate} />
             </div>
             
             <div className="flex justify-center items-center text-center my-4 p-3 bg-yellow-400 text-black rounded-lg">
@@ -349,14 +339,12 @@ const App = () => {
                 <p className="font-bold text-lg">My Total Talents: {myTotalTalents}</p>
             </div>
             
-            {studentSelectedDate &&
-              <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
-                <h3 className="text-xl font-semibold text-gray-100">📊 My Logs for {studentSelectedDate}</h3>
-                <ul>{feedbackLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">({log.timestamp?.toDate().toLocaleTimeString()}): {log.status}</li>)}</ul>
-                <h3 className="text-xl font-semibold pt-4 text-gray-100">❓ My Questions/Comments for {studentSelectedDate}</h3>
-                <ul>{questionsLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">[{log.type}]: {log.text}</li>)}</ul>
-              </div>
-            }
+            <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
+              <h3 className="text-xl font-semibold text-gray-100">📊 My All-Time Activity Log</h3>
+              <ul>{feedbackLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300"><span className="font-bold">{log.date}</span>: {log.status}</li>)}</ul>
+              <h3 className="text-xl font-semibold pt-4 text-gray-100">❓ </h3>
+              <ul>{questionsLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300"><span className="font-bold">{log.date}</span> [{log.type}]: {log.text}</li>)}</ul>
+            </div>
           </div>
 
           <div className="flex flex-col items-center mt-8 p-4 border-t border-slate-600">
