@@ -77,7 +77,6 @@ const App = () => {
   const ADMIN_PASSWORD = '0811';
   
   const [adminSelectedDate, setAdminSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
-  // --- B안: Re-added student calendar state ---
   const [studentSelectedDate, setStudentSelectedDate] = useState('');
   const [talentsLog, setTalentsLog] = useState([]);
   const [myTotalTalents, setMyTotalTalents] = useState(0);
@@ -154,7 +153,6 @@ const App = () => {
       return () => { unsubLog(); unsubTalent(); };
   }, [isFirebaseConnected, db, selectedCourse, adminSelectedStudent, appId, isAdmin]);
 
-  // --- B안: Reverted student data fetching to filter by date ---
   useEffect(() => {
     if (!isFirebaseConnected || !db || isAdmin || !nameInput) {
       setFeedbackLog([]); setQuestionsLog([]); setMyTotalTalents(0);
@@ -224,7 +222,6 @@ const App = () => {
   };
   
   const isNameEntered = nameInput.trim().length > 0;
-  // --- B안: Participation now requires a selected date ---
   const isReadyToParticipate = isNameEntered && !!studentSelectedDate && isClassActive;
 
   const MainContent = () => (
@@ -303,7 +300,6 @@ const App = () => {
           </div>
           
           <div className={`${!isNameEntered || !isFirebaseConnected ? 'opacity-50 pointer-events-none' : ''}`}>
-            {/* --- B안: Student calendar is back --- */}
             <div className="flex justify-center items-center space-x-2 my-4">
               <label className="text-gray-300 text-lg">Select Class Date:</label>
               <input type="date" value={studentSelectedDate} onChange={(e) => setStudentSelectedDate(e.target.value)} className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-lg"/>
