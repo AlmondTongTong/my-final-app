@@ -31,10 +31,10 @@ const isWithinClassTime = (courseName) => {
     }
 };
 
-const ContentForm = ({ type, onAddContent, isEnabled }) => {
+const ContentForm = ({ type, onAddContent, isEnabled, placeholder }) => {
   const [text, setText] = useState('');
   const handleSubmit = (event) => { event.preventDefault(); onAddContent(text, type); setText(''); };
-  return ( <form onSubmit={handleSubmit} className="flex space-x-2"> <input type="text" value={text} onChange={(e) => setText(e.target.value)} placeholder={type === 'question' ? "Leave a Question or Comment" : "What do you think?"} disabled={!isEnabled} className="flex-1 p-3 border bg-slate-700 border-slate-500 rounded-lg text-lg" /> <button type="submit" disabled={!isEnabled || !text.trim()} className="p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg disabled:opacity-50">Add</button> </form> );
+  return ( <form onSubmit={handleSubmit} className="flex space-x-2"> <input type="text" value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} disabled={!isEnabled} className="flex-1 p-3 border bg-slate-700 border-slate-500 rounded-lg text-lg" /> <button type="submit" disabled={!isEnabled || !text.trim()} className="p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg disabled:opacity-50">Add</button> </form> );
 };
 
 const AdminLoginForm = ({ onAdminLogin }) => {
@@ -70,8 +70,7 @@ const App = () => {
   const [isClassActive, setIsClassActive] = useState(false);
   const [gradedPosts, setGradedPosts] = useState(new Set());
   const [talentTransactions, setTalentTransactions] = useState([]);
-  // --- NEW FEATURE 1: State for daily progress tracking ---
-  const [dailyProgress, setDailyProgress] = useState({ question: false, comment: false });
+  const [dailyProgress, setDailyProgress] = useState({ question_comment: 0, reasoning: 0 });
   
   const showMessage = useCallback((msg) => { setMessage(msg); setShowMessageBox(true); setTimeout(() => { setShowMessageBox(false); setMessage(''); }, 3000); }, []);
   const getFirstName = useCallback((fullName) => { if (!fullName) return ''; const parts = fullName.split(', '); return parts.length > 1 ? parts[1] : parts[0]; }, []);
@@ -100,7 +99,7 @@ const App = () => {
   const [studentActivityLog, setStudentActivityLog] = useState([]);
   useEffect(() => {
     if (!isFirebaseConnected || !db || isAdmin || !nameInput) {
-       setStudentActivityLog([]); setMyTotalTalents(0); setTalentTransactions([]); setDailyProgress({ question: false, comment: false }); return;
+       setStudentActivityLog([]); setMyTotalTalents(0); setTalentTransactions([]); setDailyProgress({ question_comment: 0, reasoning: 0 }); return;
     }
     const publicDataPath = `/artifacts/${appId}/public/data`;
     const transactionsQuery = query(collection(db, `${publicDataPath}/talentTransactions`), where("name", "==", nameInput));
@@ -114,12 +113,11 @@ const App = () => {
       unsubActivity = onSnapshot(activityQuery, (snap) => {
         const activities = snap.docs.map(doc => doc.data());
         setStudentActivityLog(activities.sort((a,b) => b.timestamp - a.timestamp));
-        // --- NEW FEATURE 1: Calculate daily progress ---
-        const hasQuestion = activities.some(act => act.type === 'question');
-        const hasComment = activities.some(act => act.type === 'comment');
-        setDailyProgress({ question: hasQuestion, comment: hasComment });
+        const qcCount = activities.filter(act => act.type === 'question_comment').length;
+        const rCount = activities.filter(act => act.type === 'reasoning').length;
+        setDailyProgress({ question_comment: qcCount, reasoning: rCount });
       });
-    } else { setStudentActivityLog([]); setDailyProgress({ question: false, comment: false }); }
+    } else { setStudentActivityLog([]); setDailyProgress({ question_comment: 0, reasoning: 0 }); }
     
     return () => { unsubActivity(); unsubMyTalent(); unsubTransactions(); };
   }, [isFirebaseConnected, db, selectedCourse, nameInput, studentSelectedDate, appId, isAdmin]);
@@ -157,12 +155,11 @@ const App = () => {
   const isNameEntered = nameInput.trim().length > 0;
   const isReadyToParticipate = isNameEntered && !!studentSelectedDate && isClassActive;
 
-  // --- NEW FEATURE 2: Helper to process daily progress for all students ---
   const adminDailyProgress = useMemo(() => {
     return questionsLog.reduce((acc, log) => {
-        if (!acc[log.name]) { acc[log.name] = { question: false, comment: false }; }
-        if (log.type === 'question') acc[log.name].question = true;
-        if (log.type === 'comment') acc[log.name].comment = true;
+        if (!acc[log.name]) { acc[log.name] = { question_comment: 0, reasoning: 0 }; }
+        if (log.type === 'question_comment') acc[log.name].question_comment++;
+        if (log.type === 'reasoning') acc[log.name].reasoning++;
         return acc;
     }, {});
   }, [questionsLog]);
@@ -185,10 +182,9 @@ const App = () => {
           ) : (
             <>
               <div className="flex justify-center items-center space-x-2 mb-6"> <label className="text-gray-300 text-lg">View Logs for Date:</label> <input type="date" value={adminSelectedDate} onChange={(e) => setAdminSelectedDate(e.target.value)} className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-lg"/> </div>
-              {/* --- NEW FEATURE 2: Admin Daily Progress View --- */}
               <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
                 <h3 className="text-xl font-semibold mb-2">Daily Requirement Progress for {adminSelectedDate}</h3>
-                <ul className="space-y-1 text-sm">{Object.entries(adminDailyProgress).map(([name, progress]) => ( <li key={name} className="flex justify-between items-center"> <span>{getFirstName(name)}:</span> <span> {progress.question ? '✅' : '❌'} Q / {progress.comment ? '✅' : '❌'} C </span> </li> ))}</ul>
+                <ul className="space-y-1 text-sm">{Object.entries(adminDailyProgress).map(([name, progress]) => { const qcMet = progress.question_comment >= 2; const rMet = progress.reasoning >= 2; return ( <li key={name} className="flex justify-between items-center"> <span>{getFirstName(name)}:</span> <span> <span className={qcMet ? 'text-green-400' : 'text-red-400'}>{qcMet ? '✅' : '❌'} {progress.question_comment}/2 Q/C</span> / <span className={rMet ? 'text-green-400' : 'text-red-400'}>{rMet ? '✅' : '❌'} {progress.reasoning}/2 R</span> </span> </li> ); })}</ul>
               </div>
               <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
                 <h3 className="text-xl font-semibold">❓ Daily Posts</h3>
@@ -206,30 +202,25 @@ const App = () => {
           
           <div className={`${!isNameEntered || !isFirebaseConnected ? 'opacity-50 pointer-events-none' : ''}`}>
             <div className="flex justify-center items-center space-x-2 my-4"> <label className="text-gray-300 text-lg">View My Posts for Date:</label> <input type="date" value={studentSelectedDate} onChange={(e) => setStudentSelectedDate(e.target.value)} className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-lg"/> </div>
-            {/* --- NEW FEATURE 1: Daily Requirement UI --- */}
             <div className="text-center p-3 bg-slate-700 text-white rounded-lg mb-4">
-                <p className="font-bold">Daily Requirement: 2 Talents (1 Q + 1 C)</p>
+                <p className="font-bold">Daily Requirement: 4 Talents (2 Q/C + 2 Reasoning)</p>
                 <p className="text-sm">Today's Progress: 
-                    <span className="mx-1">{dailyProgress.question ? '[✅ Question]' : '[❌ Question]'}</span>
-                    <span className="mx-1">{dailyProgress.comment ? '[✅ Comment]' : '[❌ Comment]'}</span>
+                    <span className={`mx-1 ${dailyProgress.question_comment >= 2 ? 'text-green-400' : 'text-red-400'}`}>[{dailyProgress.question_comment}/2 Q/C]</span>
+                    <span className={`mx-1 ${dailyProgress.reasoning >= 2 ? 'text-green-400' : 'text-red-400'}`}>[{dailyProgress.reasoning}/2 Reasoning]</span>
                 </p>
             </div>
-
             {!isClassActive && isNameEntered && !!studentSelectedDate && <div className="text-center p-3 bg-red-800 text-white rounded-lg mb-4"><p>You can only submit responses during class time.</p></div>}
             <div className={`p-4 border border-slate-600 rounded-xl mb-6 ${!isReadyToParticipate ? 'opacity-50 pointer-events-none' : ''}`}>
-              <ContentForm type="question" onAddContent={handleAddContent} isEnabled={isReadyToParticipate} />
+              <ContentForm type="question_comment" onAddContent={handleAddContent} isEnabled={isReadyToParticipate} placeholder="Post 2 Questions/Comments..." />
               <div className="my-4 border-t border-slate-700"></div>
-              <ContentForm type="comment" onAddContent={handleAddContent} isEnabled={isReadyToParticipate} />
+              <ContentForm type="reasoning" onAddContent={handleAddContent} isEnabled={isReadyToParticipate} placeholder="Post 2 Reasoning posts..." />
             </div>
             <div className="flex justify-center items-center text-center my-4 p-3 bg-yellow-400 text-black rounded-lg"> <img src="/talent-coin.png" alt="Talent coin" className="w-6 h-6 mr-2" /> <p className="font-bold text-lg">My Total Talents: {myTotalTalents}</p> </div>
-            
             <div className="text-left p-4 border border-slate-600 rounded-xl mt-2">
               <h3 className="text-xl font-semibold text-gray-100 mb-2">My Talent History</h3>
               <ul className="text-sm space-y-1">{talentTransactions.map((log, i) => ( <li key={i} className={`p-1 flex justify-between items-center ${log.points > 0 ? 'text-green-400' : 'text-red-400'}`}> <span><span className="font-bold">{log.points > 0 ? `+${log.points}` : log.points}</span>: {log.type}</span> <span className="text-xs text-gray-500">({log.timestamp?.toDate().toLocaleDateString()})</span> </li> ))}</ul>
             </div>
-
             {studentSelectedDate && <div className="text-left p-4 border border-slate-600 rounded-xl mt-6"> <h3 className="text-xl font-semibold">My Posts for {studentSelectedDate}</h3> <ul>{studentActivityLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">[{log.type}]: {log.text}</li>)}</ul> </div> }
-            
             <div className="text-left p-4 border border-slate-600 rounded-xl mt-6"> <h3 className="text-xl font-semibold text-gray-100 mb-4">Class Score Range</h3> <TalentGraph talents={talentsLog} type="student" getFirstName={getFirstName} /> </div>
           </div>
           <div className="flex flex-col items-center mt-8 p-4 border-t border-slate-600"> <p className="text-md font-medium text-gray-200 mb-2">Admin Login</p> <AdminLoginForm onAdminLogin={handleAdminLogin} /> </div>
