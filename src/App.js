@@ -228,33 +228,26 @@ const App = () => {
   );
 
   return (
-    <div className="relative min-h-screen w-full bg-blue-100 flex items-center justify-center p-4 overflow-hidden">
+    <div className="relative min-h-screen w-full bg-custom-beige-bg flex items-center justify-center p-4 overflow-hidden">
+      {/* --- START: Large Scrapbook Background --- */}
       <div className="absolute inset-0 w-full h-full overflow-hidden">
-        {/* Photos */}
-        <img src="/photo1.jpg" alt="Collage 1" className="absolute top-[5%] left-[5%] w-40 md:w-48 rounded-lg shadow-lg transform -rotate-6 z-10" />
-        <img src="/photo2.jpg" alt="Collage 2" className="absolute top-[8%] right-[8%] w-44 md:w-56 rounded-lg shadow-lg transform rotate-3 z-10" />
-        <img src="/photo3.jpg" alt="Collage 3" className="absolute bottom-[12%] left-[10%] w-36 md:w-44 rounded-lg shadow-lg transform rotate-2 z-10" />
-        <img src="/photo4.jpg" alt="Collage 4" className="absolute bottom-[5%] right-[5%] w-48 md:w-60 rounded-lg shadow-lg transform -rotate-3 z-10" />
-        <img src="/photo5.jpg" alt="Collage 5" className="absolute top-[35%] left-[15%] w-32 md:w-40 rounded-lg shadow-lg transform rotate-8 z-10" />
-        <img src="/photo6.jpg" alt="Collage 6" className="absolute top-[50%] right-[12%] w-40 md:w-52 rounded-lg shadow-lg transform -rotate-5 z-10" />
-        <img src="/photo7.jpg" alt="Collage 7" className="absolute top-[20%] left-[30%] w-36 md:w-44 rounded-lg shadow-lg transform rotate-4 z-10" />
-        <img src="/photo8.jpg" alt="Collage 8" className="absolute bottom-[25%] right-[25%] w-40 md:w-48 rounded-lg shadow-lg transform rotate-5 z-10" />
-        <img src="/photo9.jpg" alt="Collage 9" className="absolute top-[68%] left-[2%] w-44 md:w-56 rounded-lg shadow-lg transform -rotate-8 z-10" />
-        <img src="/photo10.jpg" alt="Collage 10" className="absolute top-[3%] right-[35%] w-32 md:w-40 rounded-lg shadow-lg transform rotate-6 z-10" />
-        <img src="/photo11.jpg" alt="Collage 11" className="absolute bottom-[6%] left-[45%] w-40 md:w-52 rounded-lg shadow-lg transform -rotate-2 z-10" />
-        <img src="/photo12.jpg" alt="Collage 12" className="absolute bottom-[50%] right-[2%] w-36 md:w-44 rounded-lg shadow-lg transform rotate-12 z-10" />
-        <img src="/photo13.jpg" alt="Collage 13" className="absolute top-[75%] right-[30%] w-44 md:w-56 rounded-lg shadow-lg transform -rotate-4 z-10" />
-        <img src="/photo14.jpg" alt="Collage 14" className="absolute top-[40%] left-[1%] w-36 md:w-48 rounded-lg shadow-lg transform -rotate-12 z-10" />
-        
-        {/* CHANGE: 명언 위치/크기/폰트 수정 */}
-        <div className="absolute top-[28%] right-[25%] w-56 p-3 z-10 transform -rotate-2 bg-white rounded-lg shadow-lg">
-            <p className="font-sans text-sm text-gray-800 text-center">"Learning is not about memorizing facts, but learning to ask the right questions."</p>
-        </div>
-        <div className="absolute bottom-[22%] left-[20%] w-60 p-3 z-10 transform rotate-3 bg-yellow-50 rounded-lg shadow-lg">
-            <p className="font-sans text-base text-gray-700 font-semibold text-center">"He who asks a question is a fool for five minutes; he who does not ask remains a fool forever."</p>
-            <p className="text-right text-gray-600 italic mt-1 text-xs">- Talmudic proverb</p>
-        </div>
+        {/* Photos (Larger sizes and re-positioned) */}
+        <img src="/photo1.jpg" alt="Collage 1" className="absolute top-[2%] left-[-5%] w-96 rounded-lg shadow-2xl transform -rotate-12 z-10" />
+        <img src="/photo2.jpg" alt="Collage 2" className="absolute top-[5%] right-[-2%] w-[28rem] rounded-lg shadow-2xl transform rotate-6 z-10" />
+        <img src="/photo3.jpg" alt="Collage 3" className="absolute bottom-[15%] left-[10%] w-80 rounded-lg shadow-2xl transform rotate-3 z-10" />
+        <img src="/photo4.jpg" alt="Collage 4" className="absolute bottom-[-5%] right-[-5%] w-[32rem] rounded-lg shadow-2xl transform -rotate-6 z-10" />
+        <img src="/photo5.jpg" alt="Collage 5" className="absolute top-[38%] left-[12%] w-72 rounded-lg shadow-2xl transform rotate-12 z-10" />
+        <img src="/photo6.jpg" alt="Collage 6" className="absolute top-[45%] right-[8%] w-96 rounded-lg shadow-2xl transform -rotate-5 z-10" />
+        <img src="/photo7.jpg" alt="Collage 7" className="absolute top-[15%] left-[30%] w-80 rounded-lg shadow-2xl transform rotate-2 z-10" />
+        <img src="/photo8.jpg" alt="Collage 8" className="absolute bottom-[20%] right-[28%] w-80 rounded-lg shadow-2xl transform rotate-4 z-10" />
+        <img src="/photo9.jpg" alt="Collage 9" className="absolute bottom-[-10%] left-[-2%] w-[28rem] rounded-lg shadow-2xl transform -rotate-8 z-10" />
+        <img src="/photo10.jpg" alt="Collage 10" className="absolute top-[-5%] right-[30%] w-72 rounded-lg shadow-2xl transform rotate-8 z-10" />
+        <img src="/photo11.jpg" alt="Collage 11" className="absolute bottom-[2%] left-[40%] w-96 rounded-lg shadow-2xl transform rotate-3 z-10" />
+        <img src="/photo12.jpg" alt="Collage 12" className="absolute bottom-[45%] right-[-5%] w-80 rounded-lg shadow-2xl transform rotate-12 z-10" />
+        <img src="/photo13.jpg" alt="Collage 13" className="absolute top-[65%] right-[35%] w-96 rounded-lg shadow-2xl transform -rotate-4 z-10" />
+        <img src="/photo14.jpg" alt="Collage 14" className="absolute top-[40%] left-[-10%] w-[26rem] rounded-lg shadow-2xl transform -rotate-12 z-10" />
       </div>
+      {/* --- END: Scrapbook Background --- */}
       
       <div className="relative z-20">
         <MainContent />
