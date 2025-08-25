@@ -42,8 +42,7 @@ const App = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
   const ADMIN_PASSWORD = '0811';
-
-  // --- RE-ADDED: Separate date states for admin and student ---
+  
   const [adminSelectedDate, setAdminSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [studentSelectedDate, setStudentSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
 
@@ -85,7 +84,6 @@ const App = () => {
     initializeFirebase();
   }, [token, firebaseConfig]);
 
-  // --- MODIFIED: useEffect for Admin to fetch data for adminSelectedDate ---
   useEffect(() => {
     if (!isFirebaseConnected || !db || !isAdmin) return;
     const publicDataPath = `/artifacts/${appId}/public/data`;
@@ -100,7 +98,6 @@ const App = () => {
     return () => { unsubFeedback(); unsubQuestions(); unsubTalents(); };
   }, [isFirebaseConnected, db, selectedCourse, adminSelectedDate, appId, isAdmin]);
 
-  // --- MODIFIED: useEffect for Students to fetch data for studentSelectedDate ---
   useEffect(() => {
     if (!isFirebaseConnected || !db || isAdmin || !nameInput) {
       setFeedbackLog([]);
@@ -251,43 +248,44 @@ const App = () => {
               {COURSE_STUDENTS[selectedCourse].map((name, i) => <option key={i} value={name}>{name}</option>)}
             </select>
             <p className="text-center text-sm text-gray-400 mt-2">{isNameEntered && isFirebaseConnected ? <span className="text-orange-500 font-bold">Hello, {getFirstName(nameInput)}!</span> : <span>Select your name to enable features.</span>}{!isFirebaseConnected && <span className="block text-red-500 font-bold mt-2">🚫 DB connection failed.</span>}</p>
-            
-            {isNameEntered && isFirebaseConnected && (
-                <div className="flex justify-center items-center text-center mt-4 p-3 bg-yellow-400 text-black rounded-lg">
-                    <img src="/talent-coin.png" alt="Talent coin" className="w-6 h-6 mr-2" />
-                    <p className="font-bold text-lg">My Total Talents: {myTotalTalents}</p>
-                </div>
-            )}
           </div>
 
-          {/* --- RE-ADDED: Student Date Picker --- */}
-          {isNameEntered && isFirebaseConnected && (
+          {/* --- CHANGE 1: Name must be selected to show the rest of the content --- */}
+          <div className={`${!isNameEntered || !isFirebaseConnected ? 'opacity-50 pointer-events-none' : ''}`}>
             <div className="flex justify-center items-center space-x-2 my-4">
               <label className="text-gray-300 text-lg">Select Class Date:</label>
               <input type="date" value={studentSelectedDate} onChange={(e) => setStudentSelectedDate(e.target.value)} className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-lg"/>
             </div>
-          )}
-          
-          <div className={`text-center mb-8 ${!isNameEntered || !isFirebaseConnected ? 'opacity-50' : ''}`}>
-            <p className="text-xl font-medium text-gray-200">Understanding Check</p>
-            <div className="flex justify-center space-x-4 mt-2">
-              <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Not Understood 🙁')} disabled={!isNameEntered || !isFirebaseConnected} className={`p-4 w-12 h-12 rounded-full bg-red-500 ${clickedButton === 'Not Understood 🙁' ? 'ring-4 ring-orange-500' : ''}`}></button><span className="text-sm">Not Understood</span></div>
-              <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Confused 🤔')} disabled={!isNameEntered || !isFirebaseConnected} className={`p-4 w-12 h-12 rounded-full bg-yellow-400 ${clickedButton === 'Confused 🤔' ? 'ring-4 ring-orange-500' : ''}`}></button><span className="text-sm">Confused</span></div>
-              <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Got It! ✅')} disabled={!isNameEntered || !isFirebaseConnected} className={`p-4 w-12 h-12 rounded-full bg-green-500 ${clickedButton === 'Got It! ✅' ? 'ring-4 ring-orange-500' : ''}`}></button><span className="text-sm">Got It!</span></div>
+            
+            <div className="text-center mb-8">
+              <p className="text-xl font-medium text-gray-200">Understanding Check</p>
+              <div className="flex justify-center space-x-4 mt-2">
+                <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Not Understood 🙁')} disabled={!isNameEntered || !isFirebaseConnected} className={`p-4 w-12 h-12 rounded-full bg-red-500 ${clickedButton === 'Not Understood 🙁' ? 'ring-4 ring-orange-500' : ''}`}></button><span className="text-sm">Not Understood</span></div>
+                <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Confused 🤔')} disabled={!isNameEntered || !isFirebaseConnected} className={`p-4 w-12 h-12 rounded-full bg-yellow-400 ${clickedButton === 'Confused 🤔' ? 'ring-4 ring-orange-500' : ''}`}></button><span className="text-sm">Confused</span></div>
+                <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Got It! ✅')} disabled={!isNameEntered || !isFirebaseConnected} className={`p-4 w-12 h-12 rounded-full bg-green-500 ${clickedButton === 'Got It! ✅' ? 'ring-4 ring-orange-500' : ''}`}></button><span className="text-sm">Got It!</span></div>
+              </div>
+            </div>
+            <div className="space-y-4 mb-6">
+              <p className="text-lg font-medium text-gray-200">Leave a Question or Comment</p>
+              <form onSubmit={(e) => handleAddContent(e, 'question')} className="flex space-x-2"><input type="text" value={questionInput} onChange={(e) => setQuestionInput(e.target.value)} placeholder="Enter a question" disabled={!isNameEntered || !isFirebaseConnected} className="flex-1 p-3 border bg-slate-700 border-slate-500 rounded-lg text-lg" /><button type="submit" disabled={!isNameEntered || !isFirebaseConnected} className="p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg">Add</button></form>
+              <p className="text-base font-semibold mt-4 text-gray-200">What do you think? 🤔</p>
+              <form onSubmit={(e) => handleAddContent(e, 'comment')} className="flex space-x-2"><input type="text" value={commentInput} onChange={(e) => setCommentInput(e.target.value)} placeholder="Enter your thoughts" disabled={!isNameEntered || !isFirebaseConnected} className="flex-1 p-3 border bg-slate-700 border-slate-500 rounded-lg text-lg" /><button type="submit" disabled={!isNameEntered || !isFirebaseConnected} className="p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg">Add</button></form>
+            </div>
+            
+            {/* --- CHANGE 2: Moved Talent display to here --- */}
+            <div className="flex justify-center items-center text-center my-4 p-3 bg-yellow-400 text-black rounded-lg">
+                <img src="/talent-coin.png" alt="Talent coin" className="w-6 h-6 mr-2" />
+                <p className="font-bold text-lg">My Total Talents: {myTotalTalents}</p>
+            </div>
+
+            <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
+              <h3 className="text-xl font-semibold text-gray-100">📊 My Understanding Log for {studentSelectedDate}</h3>
+              <ul>{feedbackLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">({log.timestamp?.toDate().toLocaleTimeString()}): {log.status}</li>)}</ul>
+              <h3 className="text-xl font-semibold pt-4 text-gray-100">❓ My Questions/Comments Log for {studentSelectedDate}</h3>
+              <ul>{questionsLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">[{log.type}]: {log.text}</li>)}</ul>
             </div>
           </div>
-          <div className={`space-y-4 mb-6 ${!isNameEntered || !isFirebaseConnected ? 'opacity-50' : ''}`}>
-            <p className="text-lg font-medium text-gray-200">Leave a Question or Comment</p>
-            <form onSubmit={(e) => handleAddContent(e, 'question')} className="flex space-x-2"><input type="text" value={questionInput} onChange={(e) => setQuestionInput(e.target.value)} placeholder="Enter a question" disabled={!isNameEntered || !isFirebaseConnected} className="flex-1 p-3 border bg-slate-700 border-slate-500 rounded-lg text-lg" /><button type="submit" disabled={!isNameEntered || !isFirebaseConnected} className="p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg">Add</button></form>
-            <p className="text-base font-semibold mt-4 text-gray-200">What do you think? 🤔</p>
-            <form onSubmit={(e) => handleAddContent(e, 'comment')} className="flex space-x-2"><input type="text" value={commentInput} onChange={(e) => setCommentInput(e.target.value)} placeholder="Enter your thoughts" disabled={!isNameEntered || !isFirebaseConnected} className="flex-1 p-3 border bg-slate-700 border-slate-500 rounded-lg text-lg" /><button type="submit" disabled={!isNameEntered || !isFirebaseConnected} className="p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg">Add</button></form>
-          </div>
-          <div className={`text-left p-4 border border-slate-600 rounded-xl mt-6 ${!isNameEntered || !isFirebaseConnected ? 'opacity-50' : ''}`}>
-            <h3 className="text-xl font-semibold text-gray-100">📊 My Understanding Log for {studentSelectedDate}</h3>
-            <ul>{feedbackLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">({log.timestamp?.toDate().toLocaleTimeString()}): {log.status}</li>)}</ul>
-            <h3 className="text-xl font-semibold pt-4 text-gray-100">❓ My Questions/Comments Log for {studentSelectedDate}</h3>
-            <ul>{questionsLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">[{log.type}]: {log.text}</li>)}</ul>
-          </div>
+
           <div className="flex flex-col items-center mt-8 p-4 border-t border-slate-600">
             <p className="text-md font-medium text-gray-200 mb-2">Admin Login</p>
             <div className="flex space-x-2"><input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} placeholder="Password" className="p-2 border bg-slate-700 border-slate-500 rounded-lg text-sm" /><button onClick={handleAdminLogin} className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg">Login</button></div>
@@ -321,7 +319,7 @@ const App = () => {
       </div>
       
       {showMessageBox && (
-        <div className="fixed top-1/2 left-1-2 -translate-x-1-2 -translate-y-1-2 bg-gray-900 text-white p-6 rounded-xl text-center z-50">
+        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-900 text-white p-6 rounded-xl text-center z-50">
           {message}
         </div>
       )}
