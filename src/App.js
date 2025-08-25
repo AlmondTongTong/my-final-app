@@ -5,13 +5,67 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore, collection, query, where, addDoc, onSnapshot, serverTimestamp, doc, setDoc, getDoc, increment } from 'firebase/firestore';
 
-// Define the courses and a hardcoded list of students for each course.
-const COURSES = ["ADV 375-01", "ADV 375-02", "ADV 461"];
-const COURSE_STUDENTS = {
-  "ADV 375-01": [ "Donovan, Robert", "Ellison, Alexis", "Futrell, Rylie", "George, Matthew", "Hammer, Olivia", "Kobayashi, Sena", "Lee, Byungho", "Mady, Gabriella", "Mawuenyega, Chloe", "Oved, Liam", "Sims, Ava", "Soke, Duru", "Walsh, William", "Warmington, Charles", "Yu, Wenbo" ],
-  "ADV 375-02": [ "Alteio, Katherine", "Asatryan, Natalie", "Bondi, Ava", "Brown, Kylie", "Calabrese, Ella", "Dougherty, Quinn", "Dutton, Madeline", "Grabinger, Katharina", "Ju, Ashley", "Lahanas, Dean", "Lange, Bella-Soleil", "McQuilling, Louisa", "Milliman, Nicole", "Nizdil, Kennedy", "Salahieh, Zayd", "Shannon, Savannah", "Tang, Yuhan", "Walz, Lucy", "Wang, Michelle", "Wanke, Karsten" ],
-  "ADV 461": [ "Bonk, Maya", "Burrow, Elizabeth", "Campos, Victoria", "Cantada, Cristian", "Chong, Timothy", "Chung, Sooa", "Cwiertnia, Zachary", "Fernandez, Francisco", "Fok, Alexis", "Gilbert, Jasmine", "Hall, Lily", "Hosea, Nicholas", "Jang, Da Eun", "Kim, Lynn", "Kim, Noelle", "Koning, William", "Lee, Edmund", "Lewandowski, Luke", "Leyson, Noah", "Lopez, Tatum", "Murphy, Alexander", "Swendsen, Katherine" ],
+// To fix the laggy typing, we create smaller components for the forms.
+// This prevents the whole page from re-rendering on every keystroke.
+
+// --- NEW COMPONENT 1: Input form for Questions and Comments ---
+const ContentForm = ({ type, onAddContent, isEnabled }) => {
+  const [text, setText] = useState('');
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    onAddContent(text, type);
+    setText(''); // Clear input after submission
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="flex space-x-2">
+      <input 
+        type="text" 
+        value={text} 
+        onChange={(e) => setText(e.target.value)} 
+        placeholder={type === 'question' ? "Enter a question" : "Enter your thoughts"}
+        disabled={!isEnabled} 
+        className="flex-1 p-3 border bg-slate-700 border-slate-500 rounded-lg text-lg" 
+      />
+      <button 
+        type="submit" 
+        disabled={!isEnabled || !text.trim()} 
+        className="p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg disabled:opacity-50"
+      >
+        Add
+      </button>
+    </form>
+  );
 };
+
+// --- NEW COMPONENT 2: Input form for Admin Login ---
+const AdminLoginForm = ({ onAdminLogin }) => {
+    const [password, setPassword] = useState('');
+
+    const handleLogin = () => {
+        onAdminLogin(password);
+    };
+
+    return (
+        <div className="flex space-x-2">
+            <input 
+                type="password" 
+                value={password} 
+                onChange={(e) => setPassword(e.target.value)} 
+                placeholder="Password" 
+                className="p-2 border bg-slate-700 border-slate-500 rounded-lg text-sm" 
+            />
+            <button 
+                onClick={handleLogin} 
+                className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg"
+            >
+                Login
+            </button>
+        </div>
+    );
+};
+
 
 // Main App component
 const App = () => {
@@ -31,16 +85,13 @@ const App = () => {
   const [db, setDb] = useState(null);
   const [isFirebaseConnected, setIsFirebaseConnected] = useState(false);
   const [nameInput, setNameInput] = useState('');
-  const [questionInput, setQuestionInput] = useState('');
-  const [commentInput, setCommentInput] = useState('');
-  const [selectedCourse, setSelectedCourse] = useState(COURSES[0]);
+  const [selectedCourse, setSelectedCourse] = useState("ADV 375-01");
   const [feedbackLog, setFeedbackLog] = useState([]);
   const [questionsLog, setQuestionsLog] = useState([]);
   const [message, setMessage] = useState('');
   const [showMessageBox, setShowMessageBox] = useState(false);
   const [clickedButton, setClickedButton] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [adminPassword, setAdminPassword] = useState('');
   const ADMIN_PASSWORD = '0811';
   
   const [adminSelectedDate, setAdminSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -125,8 +176,6 @@ const App = () => {
 
   const handleFeedback = async (status) => {
     if (!nameInput.trim()) return showMessage("Please select your name first.");
-    if (!isFirebaseConnected || !db) return showMessage("DB connection issue. Please try again. ⏳");
-    
     setClickedButton(status);
     setTimeout(() => setClickedButton(null), 1500);
 
@@ -134,32 +183,20 @@ const App = () => {
       const publicDataPath = `/artifacts/${appId}/public/data`;
       await addDoc(collection(db, `${publicDataPath}/feedback`), { name: nameInput, status, course: selectedCourse, date: new Date().toISOString().slice(0, 10), timestamp: serverTimestamp() });
       showMessage("Feedback submitted! ✅");
-    } catch (e) {
-      console.error("Error adding feedback: ", e);
-      showMessage("Failed to submit feedback. ❌");
-    }
+    } catch (e) { showMessage("Failed to submit feedback. ❌"); }
   };
 
-  const handleAddContent = async (event, type) => {
-    event.preventDefault();
-    const text = type === 'question' ? questionInput : commentInput;
+  const handleAddContent = async (text, type) => {
     if (!nameInput.trim() || !text.trim()) return showMessage("Please select your name and enter a message.");
-    if (!isFirebaseConnected || !db) return showMessage("DB connection issue. Please try again. ⏳");
-
+    
     try {
       const publicDataPath = `/artifacts/${appId}/public/data`;
       await addDoc(collection(db, `${publicDataPath}/questions`), { name: nameInput, text, type, course: selectedCourse, date: new Date().toISOString().slice(0, 10), timestamp: serverTimestamp() });
       showMessage("Submission complete! ✅");
-      if (type === 'question') setQuestionInput('');
-      else setCommentInput('');
-    } catch (e) {
-      console.error("Error adding content: ", e);
-      showMessage("Submission failed. ❌");
-    }
+    } catch (e) { showMessage("Submission failed. ❌"); }
   };
 
   const handleGiveTalent = async (studentName) => {
-    if (!db) return showMessage("DB connection issue.");
     const publicDataPath = `/artifacts/${appId}/public/data`;
     const talentDocRef = doc(db, `${publicDataPath}/talents`, studentName);
     
@@ -171,20 +208,14 @@ const App = () => {
             await setDoc(talentDocRef, { name: studentName, course: selectedCourse, totalTalents: 1 });
         }
         showMessage(`${getFirstName(studentName)} received +1 Talent! ✨`);
-    } catch(e) {
-        console.error("Error giving talent: ", e);
-        showMessage("Failed to give talent.");
-    }
+    } catch(e) { showMessage("Failed to give talent."); }
   };
 
-  const handleAdminLogin = () => {
-    if (adminPassword === ADMIN_PASSWORD) {
+  const handleAdminLogin = (password) => {
+    if (password === ADMIN_PASSWORD) {
       setIsAdmin(true);
       showMessage("Admin Login successful! 🔑");
-    } else {
-      showMessage("Incorrect password. 🚫");
-      setIsAdmin(false);
-    }
+    } else { showMessage("Incorrect password. 🚫"); }
   };
   
   const isNameEntered = nameInput.trim().length > 0;
@@ -200,7 +231,7 @@ const App = () => {
             <input type="date" value={adminSelectedDate} onChange={(e) => setAdminSelectedDate(e.target.value)} className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-lg"/>
           </div>
           <div className="flex flex-wrap justify-center gap-2 mb-6">
-            {COURSES.map((course) => <button key={course} onClick={() => setSelectedCourse(course)} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)}
+            {["ADV 375-01", "ADV 375-02", "ADV 461"].map((course) => <button key={course} onClick={() => setSelectedCourse(course)} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)}
           </div>
           <h2 className="text-2xl font-semibold mb-4 text-center text-gray-200">{adminSelectedDate} - {selectedCourse} Data</h2>
           
@@ -239,7 +270,7 @@ const App = () => {
           <h1 className="text-3xl font-bold text-center mb-1">Ahnstoppable Learning:<br /><span className="text-orange-500">Freely Ask, Freely Learn</span></h1>
           <div className="flex justify-center space-x-2 my-2 text-3xl"><span>😁</span><span>😀</span><span>😁</span></div>
           <div className="flex flex-wrap justify-center gap-2 mb-6 mt-4">
-            {COURSES.map((course) => <button key={course} onClick={() => { setSelectedCourse(course); setNameInput(''); }} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)}
+             {["ADV 375-01", "ADV 375-02", "ADV 461"].map((course) => <button key={course} onClick={() => { setSelectedCourse(course); setNameInput(''); }} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)}
           </div>
           <h2 className="text-2xl font-semibold mb-4 text-center text-gray-200">{selectedCourse}</h2>
           <div className="mb-6">
@@ -250,7 +281,6 @@ const App = () => {
             <p className="text-center text-sm text-gray-400 mt-2">{isNameEntered && isFirebaseConnected ? <span className="text-orange-500 font-bold">Hello, {getFirstName(nameInput)}!</span> : <span>Select your name to enable features.</span>}{!isFirebaseConnected && <span className="block text-red-500 font-bold mt-2">🚫 DB connection failed.</span>}</p>
           </div>
 
-          {/* --- CHANGE 1: Name must be selected to show the rest of the content --- */}
           <div className={`${!isNameEntered || !isFirebaseConnected ? 'opacity-50 pointer-events-none' : ''}`}>
             <div className="flex justify-center items-center space-x-2 my-4">
               <label className="text-gray-300 text-lg">Select Class Date:</label>
@@ -260,19 +290,18 @@ const App = () => {
             <div className="text-center mb-8">
               <p className="text-xl font-medium text-gray-200">Understanding Check</p>
               <div className="flex justify-center space-x-4 mt-2">
-                <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Not Understood 🙁')} disabled={!isNameEntered || !isFirebaseConnected} className={`p-4 w-12 h-12 rounded-full bg-red-500 ${clickedButton === 'Not Understood 🙁' ? 'ring-4 ring-orange-500' : ''}`}></button><span className="text-sm">Not Understood</span></div>
-                <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Confused 🤔')} disabled={!isNameEntered || !isFirebaseConnected} className={`p-4 w-12 h-12 rounded-full bg-yellow-400 ${clickedButton === 'Confused 🤔' ? 'ring-4 ring-orange-500' : ''}`}></button><span className="text-sm">Confused</span></div>
-                <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Got It! ✅')} disabled={!isNameEntered || !isFirebaseConnected} className={`p-4 w-12 h-12 rounded-full bg-green-500 ${clickedButton === 'Got It! ✅' ? 'ring-4 ring-orange-500' : ''}`}></button><span className="text-sm">Got It!</span></div>
+                <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Not Understood 🙁')} className={`p-4 w-12 h-12 rounded-full bg-red-500 ${clickedButton === 'Not Understood 🙁' ? 'ring-4 ring-orange-500' : ''}`}><span className="text-sm"></span></button><span className="text-sm">Not Understood</span></div>
+                <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Confused 🤔')} className={`p-4 w-12 h-12 rounded-full bg-yellow-400 ${clickedButton === 'Confused 🤔' ? 'ring-4 ring-orange-500' : ''}`}><span className="text-sm"></span></button><span className="text-sm">Confused</span></div>
+                <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Got It! ✅')} className={`p-4 w-12 h-12 rounded-full bg-green-500 ${clickedButton === 'Got It! ✅' ? 'ring-4 ring-orange-500' : ''}`}><span className="text-sm"></span></button><span className="text-sm">Got It!</span></div>
               </div>
             </div>
             <div className="space-y-4 mb-6">
               <p className="text-lg font-medium text-gray-200">Leave a Question or Comment</p>
-              <form onSubmit={(e) => handleAddContent(e, 'question')} className="flex space-x-2"><input type="text" value={questionInput} onChange={(e) => setQuestionInput(e.target.value)} placeholder="Enter a question" disabled={!isNameEntered || !isFirebaseConnected} className="flex-1 p-3 border bg-slate-700 border-slate-500 rounded-lg text-lg" /><button type="submit" disabled={!isNameEntered || !isFirebaseConnected} className="p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg">Add</button></form>
+              <ContentForm type="question" onAddContent={handleAddContent} isEnabled={isNameEntered && isFirebaseConnected} />
               <p className="text-base font-semibold mt-4 text-gray-200">What do you think? 🤔</p>
-              <form onSubmit={(e) => handleAddContent(e, 'comment')} className="flex space-x-2"><input type="text" value={commentInput} onChange={(e) => setCommentInput(e.target.value)} placeholder="Enter your thoughts" disabled={!isNameEntered || !isFirebaseConnected} className="flex-1 p-3 border bg-slate-700 border-slate-500 rounded-lg text-lg" /><button type="submit" disabled={!isNameEntered || !isFirebaseConnected} className="p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg">Add</button></form>
+              <ContentForm type="comment" onAddContent={handleAddContent} isEnabled={isNameEntered && isFirebaseConnected} />
             </div>
             
-            {/* --- CHANGE 2: Moved Talent display to here --- */}
             <div className="flex justify-center items-center text-center my-4 p-3 bg-yellow-400 text-black rounded-lg">
                 <img src="/talent-coin.png" alt="Talent coin" className="w-6 h-6 mr-2" />
                 <p className="font-bold text-lg">My Total Talents: {myTotalTalents}</p>
@@ -288,7 +317,7 @@ const App = () => {
 
           <div className="flex flex-col items-center mt-8 p-4 border-t border-slate-600">
             <p className="text-md font-medium text-gray-200 mb-2">Admin Login</p>
-            <div className="flex space-x-2"><input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} placeholder="Password" className="p-2 border bg-slate-700 border-slate-500 rounded-lg text-sm" /><button onClick={handleAdminLogin} className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg">Login</button></div>
+            <AdminLoginForm onAdminLogin={handleAdminLogin} />
           </div>
         </>
       )}
@@ -296,26 +325,32 @@ const App = () => {
   );
 
   return (
-    <div className="relative min-h-screen w-full bg-custom-beige-bg flex items-center justify-center p-4 overflow-hidden">
-      <div className="absolute inset-0 w-full h-full overflow-hidden">
-        <img src="/photo1.jpg" alt="Collage 1" className="absolute top-[2%] left-[-5%] w-96 rounded-lg shadow-2xl transform -rotate-12 z-10" />
-        <img src="/photo2.jpg" alt="Collage 2" className="absolute top-[5%] right-[-2%] w-[28rem] rounded-lg shadow-2xl transform rotate-6 z-10" />
-        <img src="/photo3.jpg" alt="Collage 3" className="absolute bottom-[15%] left-[10%] w-80 rounded-lg shadow-2xl transform rotate-3 z-10" />
-        <img src="/photo4.jpg" alt="Collage 4" className="absolute bottom-[-5%] right-[-5%] w-[32rem] rounded-lg shadow-2xl transform -rotate-6 z-10" />
-        <img src="/photo5.jpg" alt="Collage 5" className="absolute top-[38%] left-[12%] w-72 rounded-lg shadow-2xl transform rotate-12 z-10" />
-        <img src="/photo6.jpg" alt="Collage 6" className="absolute top-[45%] right-[8%] w-96 rounded-lg shadow-2xl transform -rotate-5 z-10" />
-        <img src="/photo7.jpg" alt="Collage 7" className="absolute top-[15%] left-[30%] w-80 rounded-lg shadow-2xl transform rotate-2 z-10" />
-        <img src="/photo8.jpg" alt="Collage 8" className="absolute bottom-[20%] right-[28%] w-80 rounded-lg shadow-2xl transform rotate-4 z-10" />
-        <img src="/photo9.jpg" alt="Collage 9" className="absolute bottom-[-10%] left-[-2%] w-[28rem] rounded-lg shadow-2xl transform -rotate-8 z-10" />
-        <img src="/photo10.jpg" alt="Collage 10" className="absolute top-[-5%] right-[30%] w-72 rounded-lg shadow-2xl transform rotate-8 z-10" />
-        <img src="/photo11.jpg" alt="Collage 11" className="absolute bottom-[2%] left-[40%] w-96 rounded-lg shadow-2xl transform rotate-3 z-10" />
-        <img src="/photo12.jpg" alt="Collage 12" className="absolute bottom-[45%] right-[-5%] w-80 rounded-lg shadow-2xl transform rotate-12 z-10" />
-        <img src="/photo13.jpg" alt="Collage 13" className="absolute top-[65%] right-[35%] w-96 rounded-lg shadow-2xl transform -rotate-4 z-10" />
-        <img src="/photo14.jpg" alt="Collage 14" className="absolute top-[40%] left-[-10%] w-[26rem] rounded-lg shadow-2xl transform -rotate-12 z-10" />
+    <div className="min-h-screen w-full bg-custom-beige-bg flex flex-col justify-between p-2 sm:p-4">
+      {/* Header Photo Row */}
+      <div className="flex justify-center items-center gap-2 sm:gap-4 flex-wrap">
+        <img src="/photo1.jpg" alt="Gallery 1" className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />
+        <img src="/photo2.jpg" alt="Gallery 2" className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />
+        <img src="/photo3.jpg" alt="Gallery 3" className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />
+        <img src="/photo4.jpg" alt="Gallery 4" className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />
+        <img src="/photo5.jpg" alt="Gallery 5" className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />
+        <img src="/photo6.jpg" alt="Gallery 6" className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />
+        <img src="/photo7.jpg" alt="Gallery 7" className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />
       </div>
       
-      <div className="relative z-20">
+      {/* Center Content Area */}
+      <div className="flex justify-center items-center flex-grow my-4">
         <MainContent />
+      </div>
+
+      {/* Footer Photo Row */}
+      <div className="flex justify-center items-center gap-2 sm:gap-4 flex-wrap">
+        <img src="/photo8.jpg" alt="Gallery 8" className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />
+        <img src="/photo9.jpg" alt="Gallery 9" className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />
+        <img src="/photo10.jpg" alt="Gallery 10" className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />
+        <img src="/photo11.jpg" alt="Gallery 11" className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />
+        <img src="/photo12.jpg" alt="Gallery 12" className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />
+        <img src="/photo13.jpg" alt="Gallery 13" className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />
+        <img src="/photo14.jpg" alt="Gallery 14" className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />
       </div>
       
       {showMessageBox && (
