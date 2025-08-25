@@ -1,4 +1,4 @@
-/* global __app_id, __initial_auth_token */
+/* global __app_id */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
