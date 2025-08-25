@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
+import { getAuth, signInAnonymously } from 'firebase/auth';
 import { getFirestore, collection, query, where, addDoc, onSnapshot, serverTimestamp, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 
 const COURSES = ["ADV 375-01", "ADV 375-02", "ADV 461"];
@@ -45,7 +45,6 @@ const AdminLoginForm = ({ onAdminLogin }) => {
 
 const App = () => {
   const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-  const token = useMemo(() => typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null, []);
   
   const [db, setDb] = useState(null);
   const [isFirebaseConnected, setIsFirebaseConnected] = useState(false);
@@ -69,7 +68,6 @@ const App = () => {
   const [dailyProgress, setDailyProgress] = useState({ question_comment: 0, reasoning: 0 });
   const [studentActivityLog, setStudentActivityLog] = useState([]);
 
-  // --- PIN Authentication State ---
   const [pinInput, setPinInput] = useState('');
   const [pinConfirmationInput, setPinConfirmationInput] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -86,7 +84,6 @@ const App = () => {
     signInAnonymously(auth).then(() => setIsFirebaseConnected(true)).catch(console.error);
   }, []);
 
-  // --- Check if PIN is registered when a name is selected ---
   useEffect(() => {
     if (!db || !nameInput) { setIsPinRegistered(false); return; }
     const checkPin = async () => {
@@ -98,12 +95,7 @@ const App = () => {
     checkPin();
   }, [db, nameInput, appId]);
   
-  const handleNameChange = (newName) => {
-    setNameInput(newName);
-    setIsAuthenticated(false);
-    setPinInput('');
-    setPinConfirmationInput('');
-  };
+  const handleNameChange = (newName) => { setNameInput(newName); setIsAuthenticated(false); setPinInput(''); setPinConfirmationInput(''); };
 
   const handlePinLogin = async () => {
     if (!db || !nameInput) return showMessage("Please select your name first.");
@@ -111,12 +103,8 @@ const App = () => {
     const pinDocRef = doc(db, `${publicDataPath}/studentPins`, nameInput);
     try {
         const docSnap = await getDoc(pinDocRef);
-        if (docSnap.exists() && docSnap.data().pin === pinInput) {
-            setIsAuthenticated(true);
-            showMessage(`Welcome, ${getFirstName(nameInput)}!`);
-        } else {
-            showMessage("Incorrect PIN. Please try again.");
-        }
+        if (docSnap.exists() && docSnap.data().pin === pinInput) { setIsAuthenticated(true); showMessage(`Welcome, ${getFirstName(nameInput)}!`); } 
+        else { showMessage("Incorrect PIN. Please try again."); }
     } catch (e) { console.error(e); showMessage("Login error.");}
     setPinInput('');
   };
@@ -125,10 +113,8 @@ const App = () => {
     if (!db || !nameInput) return showMessage("Please select your name first.");
     if (pinInput.length !== 4) return showMessage("PIN must be 4 digits.");
     if (pinInput !== pinConfirmationInput) return showMessage("PINs do not match.");
-    
     const publicDataPath = `/artifacts/${appId}/public/data`;
     const pinDocRef = doc(db, `${publicDataPath}/studentPins`, nameInput);
-    
     try {
       await setDoc(pinDocRef, { pin: pinInput });
       setIsAuthenticated(true);
@@ -227,7 +213,32 @@ const App = () => {
   const MainContent = () => (
     <div className="w-full max-w-lg p-6 bg-slate-800 text-white rounded-xl shadow-lg box-shadow-custom">
       {isAdmin ? (
-         <p>Full Admin Dashboard UI goes here.</p> // Placeholder for Admin View
+        <>
+          <h1 className="text-3xl font-bold text-center mb-4 text-orange-500">Admin Dashboard</h1>
+          <button onClick={() => setIsAdmin(false)} className="mb-4 p-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700">Back to student view</button>
+          <div className="flex flex-wrap justify-center gap-2 mb-6"> {COURSES.map((course) => <button key={course} onClick={() => setSelectedCourse(course)} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)} </div>
+          <select value={adminSelectedStudent} onChange={(e) => setAdminSelectedStudent(e.target.value)} className="p-3 mb-6 w-full border bg-slate-700 border-slate-500 rounded-lg text-lg"> <option value="">-- View Daily Log --</option> {COURSE_STUDENTS[selectedCourse].map((name, i) => <option key={i} value={name}>{name}</option>)} </select>
+          {adminSelectedStudent ? (
+            <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
+              <h3 className="text-xl font-semibold">All Logs for {getFirstName(adminSelectedStudent)}</h3>
+              <div className="flex justify-center items-center text-center my-4 p-3 bg-yellow-400 text-black rounded-lg"> <img src="/talent-coin.png" alt="Talent coin" className="w-6 h-6 mr-2" /> <p className="font-bold text-lg">Total Talents: {talentsLog.find(t => t.id === adminSelectedStudent)?.totalTalents || 0}</p> </div>
+              <ul>{adminStudentLog.map((log) => ( <li key={log.id} className="p-2 border-b border-slate-700 text-gray-300 flex justify-between items-center"> <span className="flex-1 mr-2"><span className="font-bold">{log.date}</span> [{log.type}]: {log.text}</span> <div className="flex items-center space-x-1"> {gradedPosts.has(log.id) && <span className="text-green-500 text-xl">✅</span>} <button onClick={() => modifyTalent(log.name, -1, 'penalty', log.id)} className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700 flex-shrink-0">-1</button> <button onClick={() => modifyTalent(log.name, 1, 'bonus', log.id)} className="px-2 py-1 bg-yellow-500 text-black text-xs font-bold rounded hover:bg-yellow-600 flex-shrink-0">+1</button> </div> </li> ))}</ul>
+            </div>
+          ) : (
+            <>
+              <div className="flex justify-center items-center space-x-2 mb-6"> <label className="text-gray-300 text-lg">View Logs for Date:</label> <input type="date" value={adminSelectedDate} onChange={(e) => setAdminSelectedDate(e.target.value)} className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-lg"/> </div>
+              <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
+                <h3 className="text-xl font-semibold mb-2">Daily Requirement Progress for {adminSelectedDate}</h3>
+                <ul className="space-y-1 text-sm">{Object.entries(adminDailyProgress).map(([name, progress]) => { const qcMet = progress.question_comment >= 2; const rMet = progress.reasoning >= 2; return ( <li key={name} className="flex justify-between items-center"> <span>{getFirstName(name)}:</span> <span> <span className={qcMet ? 'text-green-400' : 'text-red-400'}>{qcMet ? '✅' : '❌'} {progress.question_comment}/2 Q/C</span> / <span className={rMet ? 'text-green-400' : 'text-red-400'}>{rMet ? '✅' : '❌'} {progress.reasoning}/2 R</span> </span> </li> ); })}</ul>
+              </div>
+              <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
+                <h3 className="text-xl font-semibold">❓ Daily Posts</h3>
+                <ul>{questionsLog.map((log) => ( <li key={log.id} className="p-2 border-b border-slate-700 text-gray-300 flex justify-between items-center"> <span className="flex-1 mr-2">{log.name} [{log.type}]: {log.text}</span> <div className="flex items-center space-x-1"> {gradedPosts.has(log.id) && <span className="text-green-500 text-xl">✅</span>} <button onClick={() => modifyTalent(log.name, -1, 'penalty', log.id)} className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700 flex-shrink-0">-1</button> <button onClick={() => modifyTalent(log.name, 1, 'bonus', log.id)} className="px-2 py-1 bg-yellow-500 text-black text-xs font-bold rounded hover:bg-yellow-600 flex-shrink-0">+1</button> </div> </li> ))}</ul>
+              </div>
+            </>
+          )}
+          <div className="text-left p-4 border border-slate-600 rounded-xl mt-6"> <h3 className="text-xl font-semibold text-gray-100 mb-4">🏆 {selectedCourse} Talent Leaderboard</h3> <TalentGraph talents={talentsLog} type="admin" getFirstName={getFirstName} /> </div>
+        </>
       ) : (
         <>
           <h1 className="text-3xl font-bold text-center mb-1">Ahnstoppable Learning:<br /><span className="text-orange-500">Freely Ask, Freely Learn</span></h1>
@@ -236,24 +247,14 @@ const App = () => {
           
           {isNameEntered && !isAuthenticated && (
             isPinRegistered ? (
-              <div className="my-4 p-4 bg-slate-700 rounded-lg">
-                <p className="text-center text-white mb-2 font-semibold">Enter your 4-digit PIN.</p>
-                <div className="flex space-x-2"> <input type="password" inputMode="numeric" maxLength="4" value={pinInput} onChange={(e) => setPinInput(e.target.value)} className="flex-1 p-3 border bg-slate-600 border-slate-500 rounded-lg text-lg text-center"/> <button onClick={handlePinLogin} className="p-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold">Login</button> </div>
-              </div>
+              <div className="my-4 p-4 bg-slate-700 rounded-lg animate-fade-in"> <p className="text-center text-white mb-2 font-semibold">Enter your 4-digit PIN.</p> <div className="flex space-x-2"> <input type="password" inputMode="numeric" maxLength="4" value={pinInput} onChange={(e) => setPinInput(e.target.value)} className="flex-1 p-3 border bg-slate-600 border-slate-500 rounded-lg text-lg text-center"/> <button onClick={handlePinLogin} className="p-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold">Login</button> </div> </div>
             ) : (
-              <div className="my-4 p-4 bg-slate-700 rounded-lg">
-                <p className="text-center text-white mb-2 font-semibold">First time? Create your 4-digit PIN.<br/><span className="text-sm font-normal">(Use the last 4 digits of your Student ID)</span></p>
-                <div className="space-y-2">
-                   <input type="password" inputMode="numeric" maxLength="4" value={pinInput} onChange={(e) => setPinInput(e.target.value)} placeholder="Create 4-digit PIN" className="w-full p-3 border bg-slate-600 border-slate-500 rounded-lg text-lg text-center"/>
-                   <input type="password" inputMode="numeric" maxLength="4" value={pinConfirmationInput} onChange={(e) => setPinConfirmationInput(e.target.value)} placeholder="Confirm PIN" className="w-full p-3 border bg-slate-600 border-slate-500 rounded-lg text-lg text-center"/>
-                   <button onClick={handlePinRegister} className="w-full p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-bold">Register & Start</button>
-                </div>
-              </div>
+              <div className="my-4 p-4 bg-slate-700 rounded-lg animate-fade-in"> <p className="text-center text-white mb-2 font-semibold">First time? Create your 4-digit PIN.<br/><span className="text-sm font-normal">(Use the last 4 digits of your Student ID)</span></p> <div className="space-y-2"> <input type="password" inputMode="numeric" maxLength="4" value={pinInput} onChange={(e) => setPinInput(e.target.value)} placeholder="Create 4-digit PIN" className="w-full p-3 border bg-slate-600 border-slate-500 rounded-lg text-lg text-center"/> <input type="password" inputMode="numeric" maxLength="4" value={pinConfirmationInput} onChange={(e) => setPinConfirmationInput(e.target.value)} placeholder="Confirm PIN" className="w-full p-3 border bg-slate-600 border-slate-500 rounded-lg text-lg text-center"/> <button onClick={handlePinRegister} className="w-full p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-bold">Register & Start</button> </div> </div>
             )
           )}
 
           {isAuthenticated && (
-            <div className="mt-4">
+            <div className="mt-4 animate-fade-in">
               <div className="flex justify-center items-center space-x-2 my-4"> <label className="text-gray-300 text-lg">View My Posts for Date:</label> <input type="date" value={studentSelectedDate} onChange={(e) => setStudentSelectedDate(e.target.value)} className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-lg"/> </div>
               <div className="text-center p-3 bg-slate-700 text-white rounded-lg mb-4">
                   <p className="font-bold">Daily Requirement: 4 Talents (2 Q/C + 2 Reasoning)</p>
