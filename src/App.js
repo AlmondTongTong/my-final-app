@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
-// --- FIX: Import `updateDoc` which is needed for incrementing ---
 import { getFirestore, collection, query, where, addDoc, onSnapshot, serverTimestamp, doc, setDoc, getDoc, increment, updateDoc } from 'firebase/firestore';
 
 const COURSES = ["ADV 375-01", "ADV 375-02", "ADV 461"];
@@ -98,7 +97,7 @@ const App = () => {
   const ADMIN_PASSWORD = '0811';
   
   const [adminSelectedDate, setAdminSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [studentSelectedDate, setStudentSelectedDate] = useState('');
+  // --- FIX: Removed the unused studentSelectedDate state variable ---
   const [talentsLog, setTalentsLog] = useState([]);
   const [myTotalTalents, setMyTotalTalents] = useState(0);
 
@@ -180,7 +179,6 @@ const App = () => {
       return;
     }
     const publicDataPath = `/artifacts/${appId}/public/data`;
-    // Student now sees ALL their logs, not filtered by date.
     const feedbackQuery = query(collection(db, `${publicDataPath}/feedback`), where("course", "==", selectedCourse), where("name", "==", nameInput));
     const questionsQuery = query(collection(db, `${publicDataPath}/questions`), where("course", "==", selectedCourse), where("name", "==", nameInput));
     const talentDocRef = doc(db, `${publicDataPath}/talents`, nameInput);
@@ -219,10 +217,8 @@ const App = () => {
     try {
         const docSnap = await getDoc(talentDocRef);
         if (docSnap.exists()) {
-            // --- FIX: Use `updateDoc` to correctly increment the value ---
             await updateDoc(talentDocRef, { totalTalents: increment(1) });
         } else {
-            // This part for creating a new document is correct
             await setDoc(talentDocRef, { name: studentName, course: selectedCourse, totalTalents: 1 });
         }
         showMessage(`${getFirstName(studentName)} received +1 Talent! ✨`);
@@ -238,7 +234,6 @@ const App = () => {
   };
   
   const isNameEntered = nameInput.trim().length > 0;
-  // Student can only participate if they have selected a name and it's during class time.
   const isReadyToParticipate = isNameEntered && isClassActive;
 
   const MainContent = () => (
@@ -342,7 +337,7 @@ const App = () => {
             <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
               <h3 className="text-xl font-semibold text-gray-100">📊 My All-Time Activity Log</h3>
               <ul>{feedbackLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300"><span className="font-bold">{log.date}</span>: {log.status}</li>)}</ul>
-              <h3 className="text-xl font-semibold pt-4 text-gray-100">❓ </h3>
+              <h3 className="text-xl font-semibold pt-4 text-gray-100">❓ My All-Time Questions/Comments</h3>
               <ul>{questionsLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300"><span className="font-bold">{log.date}</span> [{log.type}]: {log.text}</li>)}</ul>
             </div>
           </div>
