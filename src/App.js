@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
-// --- FIX: Removed unused 'getDocs' and 'limit' from import ---
 import { getFirestore, collection, query, where, addDoc, onSnapshot, serverTimestamp, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 
 const COURSES = ["ADV 375-01", "ADV 375-02", "ADV 461"];
@@ -47,7 +46,6 @@ const TalentGraph = ({ talents, type, getFirstName }) => {
         </div>
     );
 };
-
 
 const isWithinClassTime = (courseName) => {
     const now = new Date();
@@ -109,6 +107,7 @@ const App = () => {
   const ADMIN_PASSWORD = '0811';
   
   const [adminSelectedDate, setAdminSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [studentSelectedDate, setStudentSelectedDate] = useState('');
   const [talentsLog, setTalentsLog] = useState([]);
   const [myTotalTalents, setMyTotalTalents] = useState(0);
 
@@ -188,19 +187,41 @@ const App = () => {
       return () => { unsubLog(); unsubTalent(); };
   }, [isFirebaseConnected, db, selectedCourse, adminSelectedStudent, appId, isAdmin]);
 
+  const [studentActivityLog, setStudentActivityLog] = useState([]);
   useEffect(() => {
-    if (!isFirebaseConnected || !db || isAdmin || !nameInput) {
-       setMyTotalTalents(0); return;
+    if (!isFirebaseConnected || !db || isAdmin || !nameInput || !studentSelectedDate) {
+       setStudentActivityLog([]); setMyTotalTalents(0); return;
     }
     const publicDataPath = `/artifacts/${appId}/public/data`;
+
+    const activityQuery = query(collection(db, `${publicDataPath}/questions`), where("course", "==", selectedCourse), where("name", "==", nameInput), where("date", "==", studentSelectedDate));
+    const unsubActivity = onSnapshot(activityQuery, (snap) => setStudentActivityLog(snap.docs.map(doc => doc.data()).sort((a,b) => b.timestamp - a.timestamp)));
+
     const talentDocRef = doc(db, `${publicDataPath}/talents`, nameInput);
     const unsubMyTalent = onSnapshot(talentDocRef, (doc) => {
         if (doc.exists()) { setMyTotalTalents(doc.data().totalTalents); } else { setMyTotalTalents(0); }
     });
-    return () => unsubMyTalent();
-  }, [isFirebaseConnected, db, nameInput, appId, isAdmin]);
+    return () => { unsubActivity(); unsubMyTalent(); };
+  }, [isFirebaseConnected, db, selectedCourse, nameInput, studentSelectedDate, appId, isAdmin]);
 
-  const handleGiveTalent = useCallback(async (studentName) => {
+  // --- NEW FEATURE: Function to deduct talent points ---
+  const handleDeductTalent = async (studentName) => {
+    if (!db) return;
+    const publicDataPath = `/artifacts/${appId}/public/data`;
+    const talentDocRef = doc(db, `${publicDataPath}/talents`, studentName);
+    try {
+        const docSnap = await getDoc(talentDocRef);
+        if (docSnap.exists()) {
+            const currentTalents = docSnap.data().totalTalents || 0;
+            if (currentTalents > 0) { // Can't go below zero
+                await updateDoc(talentDocRef, { totalTalents: currentTalents - 1 });
+                showMessage(`${getFirstName(studentName)} lost -1 Talent. 🙁`);
+            }
+        }
+    } catch(e) { console.error("Error deducting talent: ", e); }
+  };
+
+  const handleGiveTalent = async (studentName) => {
     if (!db) return;
     const publicDataPath = `/artifacts/${appId}/public/data`;
     const talentDocRef = doc(db, `${publicDataPath}/talents`, studentName);
@@ -212,24 +233,20 @@ const App = () => {
         } else {
             await setDoc(talentDocRef, { name: studentName, course: selectedCourse, totalTalents: 1 });
         }
+        showMessage(`${getFirstName(studentName)} received +1 Talent! ✨`);
     } catch(e) { console.error("Error giving talent: ", e); }
-  }, [db, appId, selectedCourse]);
+  };
 
-  const handleAddContent = useCallback(async (text, type) => {
-    if (!nameInput.trim() || !text.trim()) return showMessage("Please select your name and enter a message.");
-    
-    const publicDataPath = `/artifacts/${appId}/public/data`;
+  const handleAddContent = async (text, type) => {
+    if (!db || !nameInput.trim() || !text.trim()) return;
     const today = new Date().toISOString().slice(0, 10);
-
+    const publicDataPath = `/artifacts/${appId}/public/data`;
     try {
       await addDoc(collection(db, `${publicDataPath}/questions`), { name: nameInput, text, type, course: selectedCourse, date: today, timestamp: serverTimestamp() });
       showMessage("Submission complete! ✅");
       await handleGiveTalent(nameInput);
-    } catch (e) { 
-        console.error("Error adding content: ", e);
-        showMessage("Submission failed. ❌"); 
-    }
-  }, [db, nameInput, selectedCourse, appId, handleGiveTalent, showMessage]);
+    } catch (e) { showMessage("Submission failed. ❌"); }
+  };
 
   const handleAdminLogin = (password) => {
     if (password === ADMIN_PASSWORD) { setIsAdmin(true); showMessage("Admin Login successful! 🔑"); } 
@@ -237,7 +254,7 @@ const App = () => {
   };
   
   const isNameEntered = nameInput.trim().length > 0;
-  const isReadyToParticipate = isNameEntered && isClassActive;
+  const isReadyToParticipate = isNameEntered && !!studentSelectedDate && isClassActive;
 
   const MainContent = () => (
     <div className="w-full max-w-lg p-6 bg-slate-800 text-white rounded-xl shadow-lg box-shadow-custom">
@@ -260,15 +277,18 @@ const App = () => {
           {adminSelectedStudent ? (
             <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
               <h3 className="text-xl font-semibold text-gray-100">All Logs for {getFirstName(adminSelectedStudent)}</h3>
-              {/* --- FIX: Restored the total talent display for the selected student --- */}
               <div className="flex justify-center items-center text-center my-4 p-3 bg-yellow-400 text-black rounded-lg">
                   <img src="/talent-coin.png" alt="Talent coin" className="w-6 h-6 mr-2" />
                   <p className="font-bold text-lg">Total Talents: {adminStudentTalent}</p>
               </div>
               <ul>{adminStudentLog.map((log, i) => (
                 <li key={i} className="p-2 border-b border-slate-700 text-gray-300 flex justify-between items-center">
-                  <span><span className="font-bold">{log.date}</span> [{log.type}]: {log.text}</span>
-                  <button onClick={() => handleGiveTalent(log.name)} className="ml-4 px-2 py-1 bg-yellow-500 text-black text-xs font-bold rounded hover:bg-yellow-600 flex-shrink-0">+1 Bonus</button>
+                  <span className="flex-1 mr-2"><span className="font-bold">{log.date}</span> [{log.type}]: {log.text}</span>
+                  {/* --- NEW FEATURE: -1 Button --- */}
+                  <div className="flex space-x-1">
+                    <button onClick={() => handleDeductTalent(log.name)} className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700 flex-shrink-0">-1</button>
+                    <button onClick={() => handleGiveTalent(log.name)} className="px-2 py-1 bg-yellow-500 text-black text-xs font-bold rounded hover:bg-yellow-600 flex-shrink-0">+1</button>
+                  </div>
                 </li>
               ))}</ul>
             </div>
@@ -283,8 +303,11 @@ const App = () => {
                 <h3 className="text-xl font-semibold text-gray-100">❓ Daily Questions/Comments</h3>
                 <ul>{questionsLog.map((log, i) => (
                   <li key={i} className="p-2 border-b border-slate-700 text-gray-300 flex justify-between items-center">
-                    <span>{log.name} [{log.type}]: {log.text}</span>
-                    <button onClick={() => handleGiveTalent(log.name)} className="ml-4 px-2 py-1 bg-yellow-500 text-black text-xs font-bold rounded hover:bg-yellow-600 flex-shrink-0">+1 Bonus</button>
+                    <span className="flex-1 mr-2">{log.name} [{log.type}]: {log.text}</span>
+                     <div className="flex space-x-1">
+                      <button onClick={() => handleDeductTalent(log.name)} className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700 flex-shrink-0">-1</button>
+                      <button onClick={() => handleGiveTalent(log.name)} className="px-2 py-1 bg-yellow-500 text-black text-xs font-bold rounded hover:bg-yellow-600 flex-shrink-0">+1</button>
+                    </div>
                   </li>
                 ))}</ul>
               </div>
@@ -299,19 +322,25 @@ const App = () => {
         <>
           <h1 className="text-3xl font-bold text-center mb-1">Ahnstoppable Learning:<br /><span className="text-orange-500">Freely Ask, Freely Learn</span></h1>
           <div className="flex flex-wrap justify-center gap-2 my-6">
-             {COURSES.map((course) => <button key={course} onClick={() => { setSelectedCourse(course); setNameInput(''); }} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)}
+             {COURSES.map((course) => <button key={course} onClick={() => { setSelectedCourse(course); setNameInput(''); setStudentSelectedDate(''); }} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)}
           </div>
           <div className="mb-6">
-            <select value={nameInput} onChange={(e) => {setNameInput(e.target.value);}} disabled={!isFirebaseConnected} className="p-3 w-full border bg-slate-700 border-slate-500 rounded-lg text-lg">
+            <select value={nameInput} onChange={(e) => {setNameInput(e.target.value); setStudentSelectedDate('');}} disabled={!isFirebaseConnected} className="p-3 w-full border bg-slate-700 border-slate-500 rounded-lg text-lg">
               <option value="">Select your name...</option>
               {COURSE_STUDENTS[selectedCourse].map((name, i) => <option key={i} value={name}>{name}</option>)}
             </select>
           </div>
           
           <div className={`${!isNameEntered || !isFirebaseConnected ? 'opacity-50 pointer-events-none' : ''}`}>
-            {!isClassActive && isNameEntered && <div className="text-center p-3 bg-red-800 text-white rounded-lg mb-4"><p>You can only submit responses during class time.</p></div>}
+            {/* --- FIX: Student calendar restored --- */}
+            <div className="flex justify-center items-center space-x-2 my-4">
+              <label className="text-gray-300 text-lg">Select Class Date:</label>
+              <input type="date" value={studentSelectedDate} onChange={(e) => setStudentSelectedDate(e.target.value)} className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-lg"/>
+            </div>
+
+            {!isClassActive && isNameEntered && !!studentSelectedDate && <div className="text-center p-3 bg-red-800 text-white rounded-lg mb-4"><p>You can only submit responses during class time.</p></div>}
             
-            <div className={`p-4 border border-slate-600 rounded-xl mb-6 ${!isClassActive ? 'opacity-50 pointer-events-none' : ''}`}>
+            <div className={`p-4 border border-slate-600 rounded-xl mb-6 ${!isReadyToParticipate ? 'opacity-50 pointer-events-none' : ''}`}>
               <ContentForm type="question" onAddContent={handleAddContent} isEnabled={isReadyToParticipate} />
               <div className="my-4 border-t border-slate-700"></div>
               <ContentForm type="comment" onAddContent={handleAddContent} isEnabled={isReadyToParticipate} />
@@ -322,6 +351,13 @@ const App = () => {
                 <p className="font-bold text-lg">My Total Talents: {myTotalTalents}</p>
             </div>
             
+            {studentSelectedDate &&
+              <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
+                <h3 className="text-xl font-semibold text-gray-100">My Logs for {studentSelectedDate}</h3>
+                <ul>{studentActivityLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">[{log.type}]: {log.text}</li>)}</ul>
+              </div>
+            }
+
             <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
               <h3 className="text-xl font-semibold text-gray-100 mb-4">Class Score Range</h3>
               <TalentGraph talents={talentsLog} type="student" getFirstName={getFirstName} />
