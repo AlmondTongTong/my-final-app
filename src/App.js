@@ -1,4 +1,4 @@
-/* global __app_id, __initial_auth_token */
+// This is a final test comment to force an update./* global __app_id, __initial_auth_token */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
