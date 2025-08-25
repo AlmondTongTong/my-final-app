@@ -31,10 +31,28 @@ const isWithinClassTime = (courseName) => {
     }
 };
 
+// --- FIX 1: Using <textarea> to prevent Enter key submission ---
 const ContentForm = ({ type, onAddContent, isEnabled, placeholder }) => {
   const [text, setText] = useState('');
   const handleSubmit = (event) => { event.preventDefault(); onAddContent(text, type); setText(''); };
-  return ( <form onSubmit={handleSubmit} className="flex space-x-2"> <input type="text" value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} disabled={!isEnabled} className="flex-1 p-3 border bg-slate-700 border-slate-500 rounded-lg text-lg" /> <button type="submit" disabled={!isEnabled || !text.trim()} className="p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg disabled:opacity-50">Add</button> </form> );
+  return ( 
+    <form onSubmit={handleSubmit} className="flex space-x-2"> 
+      <textarea
+        value={text} 
+        onChange={(e) => setText(e.target.value)} 
+        placeholder={placeholder} 
+        disabled={!isEnabled} 
+        className="flex-1 p-3 border bg-slate-700 border-slate-500 rounded-lg text-lg resize-none h-24" 
+      />
+      <button 
+        type="submit" 
+        disabled={!isEnabled || !text.trim()} 
+        className="p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg disabled:opacity-50 self-end"
+      >
+        Add
+      </button> 
+    </form> 
+  );
 };
 
 const AdminLoginForm = ({ onAdminLogin }) => {
@@ -201,14 +219,22 @@ const App = () => {
   const isNameEntered = nameInput.trim().length > 0;
   const isReadyToParticipate = isAuthenticated && isClassActive;
 
+  // --- FIX 2: Admin progress now shows all students ---
   const adminDailyProgress = useMemo(() => {
-    return questionsLog.reduce((acc, log) => {
-        if (!acc[log.name]) { acc[log.name] = { question_comment: 0, reasoning: 0 }; }
-        if (log.type === 'question_comment') acc[log.name].question_comment++;
-        if (log.type === 'reasoning') acc[log.name].reasoning++;
+    const roster = COURSE_STUDENTS[selectedCourse] || [];
+    const initialProgress = roster.reduce((acc, studentName) => {
+        acc[studentName] = { question_comment: 0, reasoning: 0 };
         return acc;
     }, {});
-  }, [questionsLog]);
+
+    questionsLog.forEach(log => {
+        if (initialProgress[log.name]) {
+            if (log.type === 'question_comment') initialProgress[log.name].question_comment++;
+            if (log.type === 'reasoning') initialProgress[log.name].reasoning++;
+        }
+    });
+    return initialProgress;
+  }, [questionsLog, selectedCourse]);
 
   const MainContent = () => (
     <div className="w-full max-w-lg p-6 bg-slate-800 text-white rounded-xl shadow-lg box-shadow-custom">
@@ -229,7 +255,7 @@ const App = () => {
               <div className="flex justify-center items-center space-x-2 mb-6"> <label className="text-gray-300 text-lg">View Logs for Date:</label> <input type="date" value={adminSelectedDate} onChange={(e) => setAdminSelectedDate(e.target.value)} className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-lg"/> </div>
               <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
                 <h3 className="text-xl font-semibold mb-2">Daily Requirement Progress for {adminSelectedDate}</h3>
-                <ul className="space-y-1 text-sm">{Object.entries(adminDailyProgress).map(([name, progress]) => { const qcMet = progress.question_comment >= 2; const rMet = progress.reasoning >= 2; return ( <li key={name} className="flex justify-between items-center"> <span>{getFirstName(name)}:</span> <span> <span className={qcMet ? 'text-green-400' : 'text-red-400'}>{qcMet ? '✅' : '❌'} {progress.question_comment}/2 Q/C</span> / <span className={rMet ? 'text-green-400' : 'text-red-400'}>{rMet ? '✅' : '❌'} {progress.reasoning}/2 R</span> </span> </li> ); })}</ul>
+                <ul className="space-y-1 text-sm h-40 overflow-y-auto">{Object.entries(adminDailyProgress).map(([name, progress]) => { const qcMet = progress.question_comment >= 2; const rMet = progress.reasoning >= 2; return ( <li key={name} className="flex justify-between items-center pr-2"> <span>{getFirstName(name)}:</span> <span> <span className={qcMet ? 'text-green-400' : 'text-red-400'}>{qcMet ? '✅' : '❌'} {progress.question_comment}/2 Q/C</span> / <span className={rMet ? 'text-green-400' : 'text-red-400'}>{rMet ? '✅' : '❌'} {progress.reasoning}/2 R</span> </span> </li> ); })}</ul>
               </div>
               <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
                 <h3 className="text-xl font-semibold">❓ Daily Posts</h3>
