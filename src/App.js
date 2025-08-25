@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
-import { getFirestore, collection, query, where, addDoc, onSnapshot, serverTimestamp, doc, setDoc, getDoc, increment, updateDoc } from 'firebase/firestore';
+// --- FIX: Removed 'increment' as it's no longer used ---
+import { getFirestore, collection, query, where, addDoc, onSnapshot, serverTimestamp, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 
 const COURSES = ["ADV 375-01", "ADV 375-02", "ADV 461"];
 const COURSE_STUDENTS = {
@@ -210,18 +211,15 @@ const App = () => {
     } catch (e) { showMessage("Submission failed. ❌"); }
   };
 
-  // --- BUG FIX: Switched to a more robust manual increment logic ---
   const handleGiveTalent = async (studentName) => {
     const publicDataPath = `/artifacts/${appId}/public/data`;
     const talentDocRef = doc(db, `${publicDataPath}/talents`, studentName);
     try {
         const docSnap = await getDoc(talentDocRef);
         if (docSnap.exists()) {
-            // If the document exists, read the current value and add 1
             const currentTalents = docSnap.data().totalTalents || 0;
             await updateDoc(talentDocRef, { totalTalents: currentTalents + 1 });
         } else {
-            // If it's the first talent, create the document with a value of 1
             await setDoc(talentDocRef, { name: studentName, course: selectedCourse, totalTalents: 1 });
         }
         showMessage(`${getFirstName(studentName)} received +1 Talent! ✨`);
