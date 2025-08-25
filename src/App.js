@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
-import { getFirestore, collection, query, where, addDoc, onSnapshot, serverTimestamp, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { getFirestore, collection, query, where, addDoc, onSnapshot, serverTimestamp, doc, setDoc, getDoc, updateDoc, getDocs, limit } from 'firebase/firestore';
 
 const COURSES = ["ADV 375-01", "ADV 375-02", "ADV 461"];
 const COURSE_STUDENTS = {
@@ -12,13 +12,47 @@ const COURSE_STUDENTS = {
   "ADV 461": [ "Bonk, Maya", "Burrow, Elizabeth", "Campos, Victoria", "Cantada, Cristian", "Chong, Timothy", "Chung, Sooa", "Cwiertnia, Zachary", "Fernandez, Francisco", "Fok, Alexis", "Gilbert, Jasmine", "Hall, Lily", "Hosea, Nicholas", "Jang, Da Eun", "Kim, Lynn", "Kim, Noelle", "Koning, William", "Lee, Edmund", "Lewandowski, Luke", "Leyson, Noah", "Lopez, Tatum", "Murphy, Alexander", "Swendsen, Katherine" ],
 };
 
+// --- NEW FEATURE: Reusable Graph Component ---
+const TalentGraph = ({ talents, type, getFirstName }) => {
+    if (talents.length === 0) return <p className="text-gray-400">No talent data yet.</p>;
+
+    const sortedTalents = [...talents].sort((a, b) => b.totalTalents - a.totalTalents);
+    const maxScore = sortedTalents.length > 0 ? sortedTalents[0].totalTalents : 0;
+    
+    let displayData = [];
+    if (type === 'admin') {
+        displayData = sortedTalents;
+    } else if (type === 'student' && sortedTalents.length > 0) {
+        const highest = sortedTalents[0];
+        const lowest = sortedTalents[sortedTalents.length - 1];
+        displayData = (highest.id === lowest.id) ? [highest] : [highest, lowest];
+    }
+
+    return (
+        <div className="space-y-2">
+            {displayData.map(talent => (
+                <div key={talent.id} className="w-full">
+                    <div className="flex justify-between text-sm text-gray-300 mb-1">
+                        <span>{type === 'admin' ? getFirstName(talent.name) : (talent.id === sortedTalents[0].id ? 'Highest Score' : 'Lowest Score')}</span>
+                        <span>{talent.totalTalents}</span>
+                    </div>
+                    <div className="w-full bg-slate-600 rounded-full h-4">
+                        <div 
+                            className="bg-yellow-400 h-4 rounded-full"
+                            style={{ width: maxScore > 0 ? `${(talent.totalTalents / maxScore) * 100}%` : '0%' }}
+                        ></div>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+
 const isWithinClassTime = (courseName) => {
     const now = new Date();
     const losAngelesTime = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
-    
-    const day = losAngelesTime.getDay();
-    const hour = losAngelesTime.getHours();
-    const minute = losAngelesTime.getMinutes();
+    const day = losAngelesTime.getDay(), hour = losAngelesTime.getHours(), minute = losAngelesTime.getMinutes();
     const currentTimeInMinutes = hour * 60 + minute;
 
     switch(courseName) {
@@ -68,16 +102,13 @@ const App = () => {
   const [isFirebaseConnected, setIsFirebaseConnected] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [selectedCourse, setSelectedCourse] = useState(COURSES[0]);
-  const [feedbackLog, setFeedbackLog] = useState([]);
   const [questionsLog, setQuestionsLog] = useState([]);
   const [message, setMessage] = useState('');
   const [showMessageBox, setShowMessageBox] = useState(false);
-  const [clickedButton, setClickedButton] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const ADMIN_PASSWORD = '0811';
   
   const [adminSelectedDate, setAdminSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [studentSelectedDate, setStudentSelectedDate] = useState('');
   const [talentsLog, setTalentsLog] = useState([]);
   const [myTotalTalents, setMyTotalTalents] = useState(0);
 
@@ -92,10 +123,11 @@ const App = () => {
     setTimeout(() => { setShowMessageBox(false); setMessage(''); }, 3000);
   }, []);
 
-  const getFirstName = (fullName) => {
+  const getFirstName = useCallback((fullName) => {
+    if (!fullName) return '';
     const parts = fullName.split(', ');
     return parts.length > 1 ? parts[1] : parts[0];
-  };
+  }, []);
 
   useEffect(() => {
     const initializeFirebase = async () => {
@@ -117,88 +149,54 @@ const App = () => {
     return () => clearInterval(interval);
   }, [selectedCourse]);
 
+  // --- MODIFIED: This useEffect now runs for BOTH student and admin to get the talent leaderboard data ---
+  useEffect(() => {
+    if (!isFirebaseConnected || !db) return;
+    const publicDataPath = `/artifacts/${appId}/public/data`;
+    const talentsQuery = query(collection(db, `${publicDataPath}/talents`), where("course", "==", selectedCourse));
+    const unsubTalents = onSnapshot(talentsQuery, (snap) => {
+        const talents = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setTalentsLog(talents);
+    });
+    return () => unsubTalents();
+  }, [isFirebaseConnected, db, selectedCourse, appId]);
+
+
   useEffect(() => {
     if (!isFirebaseConnected || !db || !isAdmin) return;
     const publicDataPath = `/artifacts/${appId}/public/data`;
-    setAdminSelectedStudent('');
-    setAdminStudentLog([]);
-    setAdminStudentTalent(0);
+    setAdminSelectedStudent(''); setAdminStudentLog([]); setAdminStudentTalent(0);
 
-    const feedbackQuery = query(collection(db, `${publicDataPath}/feedback`), where("course", "==", selectedCourse), where("date", "==", adminSelectedDate));
     const questionsQuery = query(collection(db, `${publicDataPath}/questions`), where("course", "==", selectedCourse), where("date", "==", adminSelectedDate));
-    const talentsQuery = query(collection(db, `${publicDataPath}/talents`), where("course", "==", selectedCourse));
-
-    const unsubFeedback = onSnapshot(feedbackQuery, (snap) => setFeedbackLog(snap.docs.map(doc => doc.data())));
     const unsubQuestions = onSnapshot(questionsQuery, (snap) => setQuestionsLog(snap.docs.map(doc => doc.data())));
-    const unsubTalents = onSnapshot(talentsQuery, (snap) => setTalentsLog(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => b.totalTalents - a.totalTalents)));
 
-    return () => { unsubFeedback(); unsubQuestions(); unsubTalents(); };
+    return () => unsubQuestions();
   }, [isFirebaseConnected, db, selectedCourse, adminSelectedDate, appId, isAdmin]);
 
   useEffect(() => {
       if (!isFirebaseConnected || !db || !isAdmin || !adminSelectedStudent) {
-        setAdminStudentLog([]);
-        setAdminStudentTalent(0);
-        return;
+        setAdminStudentLog([]); setAdminStudentTalent(0); return;
       };
       const publicDataPath = `/artifacts/${appId}/public/data`;
       const studentLogQuery = query(collection(db, `${publicDataPath}/questions`), where("course", "==", selectedCourse), where("name", "==", adminSelectedStudent));
-      const studentTalentRef = doc(db, `${publicDataPath}/talents`, adminSelectedStudent);
-
       const unsubLog = onSnapshot(studentLogQuery, (snap) => setAdminStudentLog(snap.docs.map(doc => doc.data()).sort((a, b) => b.timestamp - a.timestamp)));
-      const unsubTalent = onSnapshot(studentTalentRef, (doc) => {
-          if(doc.exists()) { setAdminStudentTalent(doc.data().totalTalents); } else { setAdminStudentTalent(0); }
-      });
-      
-      return () => { unsubLog(); unsubTalent(); };
+      return () => unsubLog();
   }, [isFirebaseConnected, db, selectedCourse, adminSelectedStudent, appId, isAdmin]);
 
   useEffect(() => {
     if (!isFirebaseConnected || !db || isAdmin || !nameInput) {
-      setFeedbackLog([]); setQuestionsLog([]); setMyTotalTalents(0);
-      return;
+       setMyTotalTalents(0); return;
     }
     const publicDataPath = `/artifacts/${appId}/public/data`;
-    let unsubFeedback = () => {};
-    let unsubQuestions = () => {};
-
-    if (studentSelectedDate) {
-        const feedbackQuery = query(collection(db, `${publicDataPath}/feedback`), where("course", "==", selectedCourse), where("name", "==", nameInput), where("date", "==", studentSelectedDate));
-        const questionsQuery = query(collection(db, `${publicDataPath}/questions`), where("course", "==", selectedCourse), where("name", "==", nameInput), where("date", "==", studentSelectedDate));
-        unsubFeedback = onSnapshot(feedbackQuery, (snap) => setFeedbackLog(snap.docs.map(doc => doc.data()).sort((a,b) => b.timestamp - a.timestamp)));
-        unsubQuestions = onSnapshot(questionsQuery, (snap) => setQuestionsLog(snap.docs.map(doc => doc.data()).sort((a,b) => b.timestamp - a.timestamp)));
-    } else {
-        setFeedbackLog([]); setQuestionsLog([]);
-    }
-
     const talentDocRef = doc(db, `${publicDataPath}/talents`, nameInput);
     const unsubMyTalent = onSnapshot(talentDocRef, (doc) => {
         if (doc.exists()) { setMyTotalTalents(doc.data().totalTalents); } else { setMyTotalTalents(0); }
     });
-    
-    return () => { unsubFeedback(); unsubQuestions(); unsubMyTalent(); };
-  }, [isFirebaseConnected, db, selectedCourse, nameInput, studentSelectedDate, appId, isAdmin]);
+    return () => unsubMyTalent();
+  }, [isFirebaseConnected, db, nameInput, appId, isAdmin]);
 
-  const handleFeedback = async (status) => {
-    if (!nameInput.trim()) return showMessage("Please select your name first.");
-    setClickedButton(status); setTimeout(() => setClickedButton(null), 1500);
-    try {
-      const publicDataPath = `/artifacts/${appId}/public/data`;
-      await addDoc(collection(db, `${publicDataPath}/feedback`), { name: nameInput, status, course: selectedCourse, date: new Date().toISOString().slice(0, 10), timestamp: serverTimestamp() });
-      showMessage("Feedback submitted! ✅");
-    } catch (e) { showMessage("Failed to submit feedback. ❌"); }
-  };
-
-  const handleAddContent = async (text, type) => {
-    if (!nameInput.trim() || !text.trim()) return showMessage("Please select your name and enter a message.");
-    try {
-      const publicDataPath = `/artifacts/${appId}/public/data`;
-      await addDoc(collection(db, `${publicDataPath}/questions`), { name: nameInput, text, type, course: selectedCourse, date: new Date().toISOString().slice(0, 10), timestamp: serverTimestamp() });
-      showMessage("Submission complete! ✅");
-    } catch (e) { showMessage("Submission failed. ❌"); }
-  };
-
-  const handleGiveTalent = async (studentName) => {
+  const handleGiveTalent = useCallback(async (studentName) => {
+    if (!db) return;
     const publicDataPath = `/artifacts/${appId}/public/data`;
     const talentDocRef = doc(db, `${publicDataPath}/talents`, studentName);
     try {
@@ -209,12 +207,26 @@ const App = () => {
         } else {
             await setDoc(talentDocRef, { name: studentName, course: selectedCourse, totalTalents: 1 });
         }
-        showMessage(`${getFirstName(studentName)} received +1 Talent! ✨`);
-    } catch(e) { 
-        console.error("Error giving talent: ", e);
-        showMessage("Failed to give talent."); 
+    } catch(e) { console.error("Error giving talent: ", e); }
+  }, [db, appId, selectedCourse]);
+
+  // --- NEW TALENT LOGIC: Every post gives +1 Talent ---
+  const handleAddContent = useCallback(async (text, type) => {
+    if (!nameInput.trim() || !text.trim()) return showMessage("Please select your name and enter a message.");
+    
+    const publicDataPath = `/artifacts/${appId}/public/data`;
+    const today = new Date().toISOString().slice(0, 10);
+
+    try {
+      await addDoc(collection(db, `${publicDataPath}/questions`), { name: nameInput, text, type, course: selectedCourse, date: today, timestamp: serverTimestamp() });
+      showMessage("Submission complete! ✅");
+      // Automatically give a talent for EVERY submission
+      await handleGiveTalent(nameInput);
+    } catch (e) { 
+        console.error("Error adding content: ", e);
+        showMessage("Submission failed. ❌"); 
     }
-  };
+  }, [db, nameInput, selectedCourse, appId, handleGiveTalent, showMessage]);
 
   const handleAdminLogin = (password) => {
     if (password === ADMIN_PASSWORD) { setIsAdmin(true); showMessage("Admin Login successful! 🔑"); } 
@@ -222,7 +234,7 @@ const App = () => {
   };
   
   const isNameEntered = nameInput.trim().length > 0;
-  const isReadyToParticipate = isNameEntered && !!studentSelectedDate && isClassActive;
+  const isReadyToParticipate = isNameEntered && isClassActive;
 
   const MainContent = () => (
     <div className="w-full max-w-lg p-6 bg-slate-800 text-white rounded-xl shadow-lg box-shadow-custom">
@@ -237,7 +249,7 @@ const App = () => {
           <div className="mb-6">
             <label className="text-gray-300 text-lg mr-2">View Specific Student:</label>
             <select value={adminSelectedStudent} onChange={(e) => setAdminSelectedStudent(e.target.value)} className="p-3 w-full border bg-slate-700 border-slate-500 rounded-lg text-lg mt-2">
-              <option value="">Select a student to view all their logs...</option>
+              <option value="">-- OR View Daily Log --</option>
               {COURSE_STUDENTS[selectedCourse].map((name, i) => <option key={i} value={name}>{name}</option>)}
             </select>
           </div>
@@ -245,13 +257,10 @@ const App = () => {
           {adminSelectedStudent ? (
             <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
               <h3 className="text-xl font-semibold text-gray-100">All Logs for {getFirstName(adminSelectedStudent)}</h3>
-              <div className="flex justify-center items-center text-center my-4 p-3 bg-yellow-400 text-black rounded-lg">
-                  <img src="/talent-coin.png" alt="Talent coin" className="w-6 h-6 mr-2" />
-                  <p className="font-bold text-lg">Total Talents: {adminStudentTalent}</p>
-              </div>
               <ul>{adminStudentLog.map((log, i) => (
-                <li key={i} className="p-2 border-b border-slate-700 text-gray-300">
-                  <span className="font-bold">{log.date}</span> [{log.type}]: {log.text}
+                <li key={i} className="p-2 border-b border-slate-700 text-gray-300 flex justify-between items-center">
+                  <span><span className="font-bold">{log.date}</span> [{log.type}]: {log.text}</span>
+                  <button onClick={() => handleGiveTalent(log.name)} className="ml-4 px-2 py-1 bg-yellow-500 text-black text-xs font-bold rounded hover:bg-yellow-600 flex-shrink-0">+1 Bonus</button>
                 </li>
               ))}</ul>
             </div>
@@ -267,76 +276,50 @@ const App = () => {
                 <ul>{questionsLog.map((log, i) => (
                   <li key={i} className="p-2 border-b border-slate-700 text-gray-300 flex justify-between items-center">
                     <span>{log.name} [{log.type}]: {log.text}</span>
-                    <button onClick={() => handleGiveTalent(log.name)} className="ml-4 px-2 py-1 bg-yellow-500 text-black text-xs font-bold rounded hover:bg-yellow-600 flex-shrink-0">+1 Talent</button>
-                  </li>
-                ))}</ul>
-              </div>
-              <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
-                <h3 className="text-xl font-semibold text-gray-100">🏆 Talent Leaderboard</h3>
-                <ul>{talentsLog.map((talent) => (
-                  <li key={talent.id} className="p-2 border-b border-slate-700 text-gray-300 flex items-center">
-                    <span>{talent.name}:</span>
-                    <span className="font-bold text-yellow-400 ml-2 flex items-center">{talent.totalTalents}<img src="/talent-coin.png" alt="Talent coin" className="w-5 h-5 ml-1" /></span>
+                    <button onClick={() => handleGiveTalent(log.name)} className="ml-4 px-2 py-1 bg-yellow-500 text-black text-xs font-bold rounded hover:bg-yellow-600 flex-shrink-0">+1 Bonus</button>
                   </li>
                 ))}</ul>
               </div>
             </>
           )}
+          {/* --- ADMIN GRAPH --- */}
+          <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
+            <h3 className="text-xl font-semibold text-gray-100 mb-4">🏆 {selectedCourse} Talent Leaderboard</h3>
+            <TalentGraph talents={talentsLog} type="admin" getFirstName={getFirstName} />
+          </div>
         </>
       ) : (
         <>
           <h1 className="text-3xl font-bold text-center mb-1">Ahnstoppable Learning:<br /><span className="text-orange-500">Freely Ask, Freely Learn</span></h1>
-          <div className="flex justify-center space-x-2 my-2 text-3xl"><span>😁</span><span>😀</span><span>😁</span></div>
-          <div className="flex flex-wrap justify-center gap-2 mb-6 mt-4">
-             {COURSES.map((course) => <button key={course} onClick={() => { setSelectedCourse(course); setNameInput(''); setStudentSelectedDate(''); }} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)}
+          <div className="flex flex-wrap justify-center gap-2 my-6">
+             {COURSES.map((course) => <button key={course} onClick={() => { setSelectedCourse(course); setNameInput(''); }} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)}
           </div>
-          <h2 className="text-2xl font-semibold mb-4 text-center text-gray-200">{selectedCourse}</h2>
           <div className="mb-6">
-            <select value={nameInput} onChange={(e) => {setNameInput(e.target.value); setStudentSelectedDate('');}} disabled={!isFirebaseConnected} className="p-3 w-full border bg-slate-700 border-slate-500 rounded-lg text-lg">
+            <select value={nameInput} onChange={(e) => {setNameInput(e.target.value);}} disabled={!isFirebaseConnected} className="p-3 w-full border bg-slate-700 border-slate-500 rounded-lg text-lg">
               <option value="">Select your name...</option>
               {COURSE_STUDENTS[selectedCourse].map((name, i) => <option key={i} value={name}>{name}</option>)}
             </select>
-            <p className="text-center text-sm text-gray-400 mt-2">{isNameEntered && isFirebaseConnected ? <span className="text-orange-500 font-bold">Hello, {getFirstName(nameInput)}!</span> : <span>Select your name to enable features.</span>}{!isFirebaseConnected && <span className="block text-red-500 font-bold mt-2">🚫 DB connection failed.</span>}</p>
           </div>
           
           <div className={`${!isNameEntered || !isFirebaseConnected ? 'opacity-50 pointer-events-none' : ''}`}>
-            <div className="flex justify-center items-center space-x-2 my-4">
-              <label className="text-gray-300 text-lg">Select Class Date:</label>
-              <input type="date" value={studentSelectedDate} onChange={(e) => setStudentSelectedDate(e.target.value)} className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-lg"/>
+            {!isClassActive && isNameEntered && <div className="text-center p-3 bg-red-800 text-white rounded-lg mb-4"><p>You can only submit responses during class time.</p></div>}
+            
+            <div className={`p-4 border border-slate-600 rounded-xl mb-6 ${!isClassActive ? 'opacity-50 pointer-events-none' : ''}`}>
+              <ContentForm type="question" onAddContent={handleAddContent} isEnabled={isReadyToParticipate} />
+              <div className="my-4 border-t border-slate-700"></div>
+              <ContentForm type="comment" onAddContent={handleAddContent} isEnabled={isReadyToParticipate} />
             </div>
-            
-            {!isClassActive && isNameEntered && !!studentSelectedDate && <div className="text-center p-3 bg-red-800 text-white rounded-lg mb-4"><p>You can only submit responses during class time.</p></div>}
-            
-            <div className={`${!isReadyToParticipate ? 'opacity-50 pointer-events-none' : ''}`}>
-              <div className="text-center mb-8">
-                <p className="text-xl font-medium text-gray-200">Understanding Check</p>
-                <div className="flex justify-center space-x-4 mt-2">
-                  <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Not Understood 🙁')} className={`p-4 w-12 h-12 rounded-full bg-red-500 ${clickedButton === 'Not Understood 🙁' ? 'ring-4 ring-orange-500' : ''}`}><span className="text-sm"></span></button><span className="text-sm">Not Understood</span></div>
-                  <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Confused 🤔')} className={`p-4 w-12 h-12 rounded-full bg-yellow-400 ${clickedButton === 'Confused 🤔' ? 'ring-4 ring-orange-500' : ''}`}><span className="text-sm"></span></button><span className="text-sm">Confused</span></div>
-                  <div className="flex flex-col items-center"><button onClick={() => handleFeedback('Got It! ✅')} className={`p-4 w-12 h-12 rounded-full bg-green-500 ${clickedButton === 'Got It! ✅' ? 'ring-4 ring-orange-500' : ''}`}><span className="text-sm"></span></button><span className="text-sm">Got It!</span></div>
-                </div>
-              </div>
-              <div className="space-y-4 mb-6">
-                <p className="text-lg font-medium text-gray-200">Leave a Question or Comment</p>
-                <ContentForm type="question" onAddContent={handleAddContent} isEnabled={isReadyToParticipate} />
-                <p className="text-base font-semibold mt-4 text-gray-200">What do you think? 🤔</p>
-                <ContentForm type="comment" onAddContent={handleAddContent} isEnabled={isReadyToParticipate} />
-              </div>
-            </div>
-            
+
             <div className="flex justify-center items-center text-center my-4 p-3 bg-yellow-400 text-black rounded-lg">
                 <img src="/talent-coin.png" alt="Talent coin" className="w-6 h-6 mr-2" />
                 <p className="font-bold text-lg">My Total Talents: {myTotalTalents}</p>
             </div>
             
-            {studentSelectedDate &&
-              <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
-                <h3 className="text-xl font-semibold text-gray-100">📊 My Logs for {studentSelectedDate}</h3>
-                <ul>{feedbackLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">({log.timestamp?.toDate().toLocaleTimeString()}): {log.status}</li>)}</ul>
-                <h3 className="text-xl font-semibold pt-4 text-gray-100">❓ My Questions/Comments for {studentSelectedDate}</h3>
-                <ul>{questionsLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">[{log.type}]: {log.text}</li>)}</ul>
-              </div>
-            }
+            {/* --- STUDENT GRAPH --- */}
+            <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
+              <h3 className="text-xl font-semibold text-gray-100 mb-4">Class Score Range</h3>
+              <TalentGraph talents={talentsLog} type="student" getFirstName={getFirstName} />
+            </div>
           </div>
 
           <div className="flex flex-col items-center mt-8 p-4 border-t border-slate-600">
