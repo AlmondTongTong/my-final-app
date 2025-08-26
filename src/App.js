@@ -107,11 +107,10 @@ const App = () => {
   const handleAdminLogin = (password) => { if (password === ADMIN_PASSWORD) { setIsAdmin(true); showMessage("Admin Login successful! 🔑"); } else { showMessage("Incorrect password. 🚫"); } };
   const handleReply = useCallback(async (logId, replyText) => { if (!db || !replyText.trim()) return; const questionDocRef = doc(db, `/artifacts/${appId}/public/data/questions`, logId); try { await updateDoc(questionDocRef, { reply: replyText }); showMessage("Reply sent!"); } catch (e) { showMessage("Failed to send reply."); console.error(e); } }, [db, appId, showMessage]);
   const handleLike = useCallback(async (logId) => { if(!db) return; const questionDocRef = doc(db, `/artifacts/${appId}/public/data/questions`, logId); try { await updateDoc(questionDocRef, { liked: true }); } catch (e) { console.error("Error liking post:", e) } }, [db, appId]);
-
+  
   const isNameEntered = nameInput.trim().length > 0;
-  // --- FIX 1: Student can interact if authenticated, regardless of class time ---
+  // --- FIX: Removed unused 'canViewContent' variable ---
   const isReadyToParticipate = isAuthenticated && isClassActive;
-  const canViewContent = isAuthenticated;
 
   const adminDailyProgress = useMemo(() => { const roster = COURSE_STUDENTS[selectedCourse] || []; const initialProgress = roster.reduce((acc, studentName) => { acc[studentName] = { question_comment: 0, reasoning: 0 }; return acc; }, {}); questionsLog.forEach(log => { if (initialProgress[log.name]) { if (log.type === 'question_comment') initialProgress[log.name].question_comment++; if (log.type === 'reasoning') initialProgress[log.name].reasoning++; } }); return initialProgress; }, [questionsLog, selectedCourse]);
   const ReplyForm = ({ log, onReply }) => { const [replyText, setReplyText] = useState(''); const handleSend = () => { onReply(log.id, replyText); setReplyText(''); }; return ( <div className="mt-2 flex space-x-2"> <input type="text" value={replyText} onChange={(e) => setReplyText(e.target.value)} placeholder={`Reply to ${getFirstName(log.name)}...`} className="flex-1 p-2 border bg-slate-600 border-slate-500 rounded-lg text-sm" /> <button onClick={handleSend} className="p-2 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg">Send</button> </div> ); };
