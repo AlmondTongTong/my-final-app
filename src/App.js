@@ -51,27 +51,20 @@ const App = () => {
   const getFirstName = useCallback((fullName) => { if (!fullName) return ''; const parts = fullName.split(', '); return parts.length > 1 ? parts[1] : parts[0]; }, []);
 
   const TalentGraph = ({ talentsData, type }) => {
-    // --- FIX: Leaderboard now includes all students from the roster ---
-    const courseRoster = COURSE_STUDENTS[selectedCourse] || [];
     const displayData = useMemo(() => {
+        // --- FIX: courseRoster is now defined INSIDE useMemo to satisfy the linter ---
+        const courseRoster = COURSE_STUDENTS[selectedCourse] || [];
         const talentMap = new Map(talentsData.map(t => [t.id, t.totalTalents]));
         const allStudents = courseRoster.map(name => ({
             id: name,
             name: name,
             totalTalents: talentMap.get(name) || 0,
         }));
-        
         const sorted = allStudents.sort((a, b) => b.totalTalents - a.totalTalents);
-
-        if (type === 'admin') {
-            return sorted;
-        } else if (type === 'student' && sorted.length > 0) {
-            const highest = sorted[0];
-            const lowest = sorted[sorted.length - 1];
-            return highest.id === lowest.id ? [highest] : [highest, lowest];
-        }
+        if (type === 'admin') { return sorted; } 
+        else if (type === 'student' && sorted.length > 0) { const highest = sorted[0]; const lowest = sorted[sorted.length - 1]; return highest.id === lowest.id ? [highest] : [highest, lowest]; }
         return [];
-    }, [talentsData, courseRoster, type]);
+    }, [talentsData, selectedCourse, type]); // <-- Dependency array updated
 
     if (displayData.length === 0) return <p className="text-gray-400">No talent data yet.</p>;
     const maxScore = displayData.length > 0 ? displayData[0].totalTalents : 0;
