@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { getFirestore, collection, query, where, addDoc, onSnapshot, serverTimestamp, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { getFirestore, collection, query, where, addDoc, onSnapshot, serverTimestamp, doc, setDoc, getDoc, updateDoc, orderBy } from 'firebase/firestore';
 
 const COURSES = ["ADV 375-01", "ADV 375-02", "ADV 461"];
 const COURSE_STUDENTS = { "ADV 375-01": [ "Donovan, Robert", "Ellison, Alexis", "Futrell, Rylie", "George, Matthew", "Hammer, Olivia", "Kobayashi, Sena", "Lee, Byungho", "Mady, Gabriella", "Mawuenyega, Chloe", "Oved, Liam", "Sims, Ava", "Soke, Duru", "Walsh, William", "Warmington, Charles", "Yu, Wenbo" ], "ADV 375-02": [ "Alteio, Katherine", "Asatryan, Natalie", "Bondi, Ava", "Brown, Kylie", "Calabrese, Ella", "Dougherty, Quinn", "Dutton, Madeline", "Grabinger, Katharina", "Ju, Ashley", "Lahanas, Dean", "Lange, Bella-Soleil", "McQuilling, Louisa", "Milliman, Nicole", "Nizdil, Kennedy", "Salahieh, Zayd", "Shannon, Savannah", "Tang, Yuhan", "Walz, Lucy", "Wang, Michelle", "Wanke, Karsten" ], "ADV 461": [ "Bonk, Maya", "Burrow, Elizabeth", "Campos, Victoria", "Cantada, Cristian", "Chong, Timothy", "Chung, Sooa", "Cwiertnia, Zachary", "Fernandez, Francisco", "Fok, Alexis", "Gilbert, Jasmine", "Hall, Lily", "Hosea, Nicholas", "Jang, Da Eun", "Kim, Lynn", "Kim, Noelle", "Koning, William", "Lee, Edmund", "Lewandowski, Luke", "Leyson, Noah", "Lopez, Tatum", "Murphy, Alexander", "Swendsen, Katherine" ], };
@@ -29,10 +29,8 @@ const TalentGraph = ({ talentsData, type, selectedCourse, getFirstName }) => {
         else if (type === 'student' && sorted.length > 0) { const highest = sorted[0]; const lowest = sorted[sorted.length - 1]; return highest.id === lowest.id ? [highest] : [highest, lowest]; }
         return [];
     }, [talentsData, selectedCourse, type]);
-
     if (displayData.length === 0) return <p className="text-gray-400">No talent data yet.</p>;
     const maxScore = displayData.length > 0 ? displayData[0].totalTalents : 0;
-
     return ( <div className="space-y-2"> {displayData.map(talent => ( <div key={talent.id} className="w-full"> <div className="flex justify-between text-sm text-gray-300 mb-1"> <span>{type === 'admin' ? getFirstName(talent.name) : (talent.id === displayData[0].id ? 'Highest Score' : 'Lowest Score')}</span> <span>{talent.totalTalents}</span> </div> <div className="w-full bg-slate-600 rounded-full h-4"> <div className="bg-yellow-400 h-4 rounded-full" style={{ width: maxScore > 0 ? `${(talent.totalTalents / maxScore) * 100}%` : '0%' }} ></div> </div> </div> ))} </div> );
 };
 
