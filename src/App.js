@@ -92,11 +92,13 @@ const App = () => {
       const activities = snap.docs.map(d => ({id: d.id, ...d.data()}));
       setStudentActivityLog(activities);
       setDailyProgress({ question_comment: activities.filter(a => a.type === 'question_comment').length, reasoning: activities.filter(a => a.type === 'reasoning').length });
-    });
+    }, (error) => console.error("My Posts Query Error: ", error));
+
     const allPostsQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("date", "==", studentSelectedDate), orderBy("timestamp", "desc"));
-    const unsubAll = onSnapshot(allPostsQuery, (snap) => setAllPostsLog(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+    const unsubAll = onSnapshot(allPostsQuery, (snap) => setAllPostsLog(snap.docs.map(d => ({id: d.id, ...d.data()}))), (error) => console.error("All Posts Query Error: ", error));
+    
     const feedbackQuery = query(collection(db, `/artifacts/${appId}/public/data/feedback`), where("course", "==", selectedCourse), where("name", "==", nameInput), where("date", "==", studentSelectedDate), orderBy("timestamp", "desc"));
-    const unsubF = onSnapshot(feedbackQuery, (snap) => setStudentFeedbackLog(snap.docs.map(d => d.data())));
+    const unsubF = onSnapshot(feedbackQuery, (snap) => setStudentFeedbackLog(snap.docs.map(d => d.data())), (error) => console.error("My Feedback Query Error: ", error));
 
     return () => { unsubA(); unsubM(); unsubT(); unsubF(); unsubAll(); };
   }, [db, selectedCourse, nameInput, studentSelectedDate, appId, isAdmin, isAuthenticated]);
@@ -119,7 +121,7 @@ const App = () => {
     <div className="w-full max-w-lg p-6 bg-slate-800 text-white rounded-xl shadow-lg box-shadow-custom">
       {isAdmin ? (
         <>
-          <h1 className="text-3xl font-bold text-center mb-4">''Ahn''stoppable Learning</h1>
+          <h1 className="text-3xl font-bold text-center mb-4"><span className="text-green-500">''Ahn''</span>stoppable Learning</h1>
           <button onClick={() => setIsAdmin(false)} className="mb-4 p-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700">Back to student view</button>
           <div className="flex flex-wrap justify-center gap-2 mb-6"> {COURSES.map((course) => <button key={course} onClick={() => setSelectedCourse(course)} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)} </div>
           <select value={adminSelectedStudent} onChange={(e) => setAdminSelectedStudent(e.target.value)} className="p-3 mb-6 w-full border bg-slate-700 border-slate-500 rounded-lg text-lg"> <option value="">-- View Daily Log --</option> {COURSE_STUDENTS[selectedCourse].map((name, i) => <option key={i} value={name}>{name}</option>)} </select>
@@ -141,7 +143,7 @@ const App = () => {
         </>
       ) : (
         <>
-          <h1 className="text-3xl font-bold text-center mb-1">''Ahn''stoppable Learning:<br /><span className="text-orange-500">Freely Ask, Freely Learn</span></h1>
+          <h1 className="text-3xl font-bold text-center mb-1"><span className="text-green-500">''Ahn''</span>stoppable Learning:<br /><span className="text-orange-500">Freely Ask, Freely Learn</span></h1>
           <div className="flex flex-wrap justify-center gap-2 my-6"> {COURSES.map((course) => <button key={course} onClick={() => { setSelectedCourse(course); handleNameChange(''); }} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)} </div>
           <select value={nameInput} onChange={(e) => handleNameChange(e.target.value)} disabled={isAuthenticated} className="p-3 mb-2 w-full border bg-slate-700 border-slate-500 rounded-lg text-lg disabled:opacity-50"> <option value="">Select your name...</option> {COURSE_STUDENTS[selectedCourse].map((name, i) => <option key={i} value={name}>{name}</option>)} </select>
           {isNameEntered && !isAuthenticated && <PinAuth nameInput={nameInput} isPinRegistered={isPinRegistered} onLogin={handlePinLogin} onRegister={handlePinRegister} getFirstName={getFirstName} />}
