@@ -66,6 +66,8 @@ const App = () => {
   const [questionsLog, setQuestionsLog] = useState([]);
   const [feedbackLog, setFeedbackLog] = useState([]);
   const [gradedPosts, setGradedPosts] = useState(new Set());
+  // --- NEW FEATURE: State for all anonymous posts ---
+  const [allPostsLog, setAllPostsLog] = useState([]);
   
   const showMessage = useCallback((msg) => { setMessage(msg); setShowMessageBox(true); setTimeout(() => { setShowMessageBox(false); setMessage(''); }, 3000); }, []);
   const getFirstName = useCallback((fullName) => { if (!fullName) return ''; const parts = fullName.split(', '); return parts.length > 1 ? parts[1] : parts[0]; }, []);
@@ -84,21 +86,26 @@ const App = () => {
   useEffect(() => { if (!db || !isAdmin || !adminSelectedStudent) { setAdminStudentLog([]); return; }; const logQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("name", "==", adminSelectedStudent)); const unsub = onSnapshot(logQuery, (snap) => setAdminStudentLog(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.timestamp - a.timestamp))); return () => unsub(); }, [db, selectedCourse, adminSelectedStudent, appId, isAdmin]);
 
   useEffect(() => {
-    if (!db || isAdmin || !nameInput || !isAuthenticated) { setStudentActivityLog([]); setMyTotalTalents(0); setTalentTransactions([]); setDailyProgress({ question_comment: 0, reasoning: 0 }); setStudentFeedbackLog([]); return; }
+    if (!db || isAdmin || !nameInput || !isAuthenticated) { setStudentActivityLog([]); setAllPostsLog([]); setMyTotalTalents(0); setTalentTransactions([]); setDailyProgress({ question_comment: 0, reasoning: 0 }); setStudentFeedbackLog([]); return; }
     const transactionsQuery = query(collection(db, `/artifacts/${appId}/public/data/talentTransactions`), where("name", "==", nameInput)); const unsubT = onSnapshot(transactionsQuery, (snap) => setTalentTransactions(snap.docs.map(d => d.data()).sort((a,b) => b.timestamp - a.timestamp)));
     const talentDocRef = doc(db, `/artifacts/${appId}/public/data/talents`, nameInput); const unsubM = onSnapshot(talentDocRef, (d) => setMyTotalTalents(d.exists() ? d.data().totalTalents : 0));
-    let unsubA = () => {}, unsubF = () => {};
+    let unsubA = () => {}, unsubF = () => {}, unsubAll = () => {};
     if (studentSelectedDate) {
+      // Fetch user's own posts
       const activityQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("name", "==", nameInput), where("date", "==", studentSelectedDate));
       unsubA = onSnapshot(activityQuery, (snap) => {
         const activities = snap.docs.map(d => ({id: d.id, ...d.data()}));
         setStudentActivityLog(activities.sort((a,b) => b.timestamp - a.timestamp));
         setDailyProgress({ question_comment: activities.filter(a => a.type === 'question_comment').length, reasoning: activities.filter(a => a.type === 'reasoning').length });
       });
+      // Fetch all anonymous posts for the day
+      const allPostsQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("date", "==", studentSelectedDate));
+      unsubAll = onSnapshot(allPostsQuery, (snap) => setAllPostsLog(snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => b.timestamp - a.timestamp)));
+
       const feedbackQuery = query(collection(db, `/artifacts/${appId}/public/data/feedback`), where("course", "==", selectedCourse), where("name", "==", nameInput), where("date", "==", studentSelectedDate));
       unsubF = onSnapshot(feedbackQuery, (snap) => setStudentFeedbackLog(snap.docs.map(d => d.data()).sort((a,b) => b.timestamp - a.timestamp)));
-    } else { setStudentActivityLog([]); setDailyProgress({ question_comment: 0, reasoning: 0 }); setStudentFeedbackLog([]); }
-    return () => { unsubA(); unsubM(); unsubT(); unsubF(); };
+    } else { setStudentActivityLog([]); setAllPostsLog([]); setDailyProgress({ question_comment: 0, reasoning: 0 }); setStudentFeedbackLog([]); }
+    return () => { unsubA(); unsubM(); unsubT(); unsubF(); unsubAll(); };
   }, [db, selectedCourse, nameInput, studentSelectedDate, appId, isAdmin, isAuthenticated]);
 
   const modifyTalent = useCallback(async (studentName, amount, type, logId) => { if (!db) return; const talentDocRef = doc(db, `/artifacts/${appId}/public/data/talents`, studentName); const transactionColRef = collection(db, `/artifacts/${appId}/public/data/talentTransactions`); try { const docSnap = await getDoc(talentDocRef); let currentTalents = docSnap.exists() ? docSnap.data().totalTalents || 0 : 0; const newTotal = currentTalents + amount; if (newTotal < 0) { showMessage("Talent cannot go below 0."); return; } if (docSnap.exists()) { await updateDoc(talentDocRef, { totalTalents: newTotal }); } else { await setDoc(talentDocRef, { name: studentName, course: selectedCourse, totalTalents: newTotal }); } if(type !== 'automatic') showMessage(`${getFirstName(studentName)} received ${amount > 0 ? '+1' : '-1'} Talent!`); await addDoc(transactionColRef, { name: studentName, points: amount, type: type, timestamp: serverTimestamp() }); if(logId) setGradedPosts(prev => new Set(prev).add(logId)); } catch(e) { console.error("Error modifying talent: ", e); } }, [db, appId, selectedCourse, getFirstName, showMessage]);
@@ -109,7 +116,6 @@ const App = () => {
   const handleLike = useCallback(async (logId) => { if(!db) return; const questionDocRef = doc(db, `/artifacts/${appId}/public/data/questions`, logId); try { await updateDoc(questionDocRef, { liked: true }); } catch (e) { console.error("Error liking post:", e) } }, [db, appId]);
   
   const isNameEntered = nameInput.trim().length > 0;
-  // --- FIX: Removed unused 'canViewContent' variable ---
   const isReadyToParticipate = isAuthenticated && isClassActive;
 
   const adminDailyProgress = useMemo(() => { const roster = COURSE_STUDENTS[selectedCourse] || []; const initialProgress = roster.reduce((acc, studentName) => { acc[studentName] = { question_comment: 0, reasoning: 0 }; return acc; }, {}); questionsLog.forEach(log => { if (initialProgress[log.name]) { if (log.type === 'question_comment') initialProgress[log.name].question_comment++; if (log.type === 'reasoning') initialProgress[log.name].reasoning++; } }); return initialProgress; }, [questionsLog, selectedCourse]);
@@ -148,7 +154,7 @@ const App = () => {
 
           {isAuthenticated && (
             <div className="mt-4 animate-fade-in">
-              <div className="flex justify-center items-center space-x-2 my-4"> <label className="text-gray-300 text-lg">View My Logs for Date:</label> <input type="date" value={studentSelectedDate} onChange={(e) => setStudentSelectedDate(e.target.value)} className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-lg"/> </div>
+              <div className="flex justify-center items-center space-x-2 my-4"> <label className="text-gray-300 text-lg">View Logs for Date:</label> <input type="date" value={studentSelectedDate} onChange={(e) => setStudentSelectedDate(e.target.value)} className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-lg"/> </div>
               {!isClassActive && <div className="text-center p-3 bg-red-800 text-white rounded-lg mb-4"><p>You can only submit new responses during class time.</p></div>}
               
               <div className={`p-4 border border-slate-600 rounded-xl mb-6 ${!isReadyToParticipate ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -168,7 +174,12 @@ const App = () => {
               </div>
               <div className="flex justify-center items-center text-center my-4 p-3 bg-yellow-400 text-black rounded-lg"> <img src="/talent-coin.png" alt="Talent coin" className="w-6 h-6 mr-2" /> <p className="font-bold text-lg">My Total Talents: {myTotalTalents}</p> </div>
               <div className="text-left p-4 border border-slate-600 rounded-xl mt-2"> <h3 className="text-xl font-semibold text-gray-100 mb-2">My Talent History</h3> <ul className="text-sm space-y-1">{talentTransactions.map((log, i) => ( <li key={i} className={`p-1 flex justify-between items-center ${log.points > 0 ? 'text-green-400' : 'text-red-400'}`}> <span><span className="font-bold">{log.points > 0 ? `+${log.points}` : log.points}</span>: {log.type}</span> <span className="text-xs text-gray-500">({log.timestamp?.toDate().toLocaleDateString()})</span> </li> ))}</ul> </div>
-              {studentSelectedDate && <div className="text-left p-4 border border-slate-600 rounded-xl mt-6"> <h3 className="text-xl font-semibold">Logs for {studentSelectedDate}</h3> <h4 className="font-semibold mt-2 text-gray-300">🚦 My Understanding Checks</h4> <ul>{studentFeedbackLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">({log.timestamp?.toDate().toLocaleTimeString()}): {log.status}</li>)}</ul> <h4 className="font-semibold mt-4 text-gray-300">✍️ My Posts</h4> <ul>{studentActivityLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300"><div>[{log.type}]: {log.text}</div> {log.reply && <div className="mt-2 p-2 bg-slate-600 rounded-lg text-sm text-gray-200 flex justify-between items-center"><span><b>Prof. Ahn's Reply:</b> {log.reply}</span> <button onClick={() => !log.liked && handleLike(log.id)} disabled={log.liked} className="ml-2 text-2xl disabled:opacity-50">{log.liked ? '👍' : '👍'}</button> </div>} </li>)}</ul> </div> }
+              {studentSelectedDate && <div className="text-left p-4 border border-slate-600 rounded-xl mt-6"> 
+                <h3 className="text-xl font-semibold">Logs for {studentSelectedDate}</h3> 
+                <h4 className="font-semibold mt-2 text-gray-300">🚦 My Understanding Checks</h4> <ul>{studentFeedbackLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">({log.timestamp?.toDate().toLocaleTimeString()}): {log.status}</li>)}</ul> 
+                <h4 className="font-semibold mt-4 text-gray-300">✍️ My Posts</h4> <ul>{studentActivityLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300"><div>[{log.type}]: {log.text}</div> {log.reply && <div className="mt-2 p-2 bg-slate-600 rounded-lg text-sm text-gray-200 flex justify-between items-center"><span><b>Prof. Ahn's Reply:</b> {log.reply}</span> <button onClick={() => !log.liked && handleLike(log.id)} disabled={log.liked} className="ml-2 text-2xl disabled:opacity-50">{log.liked ? '👍' : '👍'}</button> </div>} </li>)}</ul>
+                <h4 className="font-semibold mt-4 text-gray-300">👀 All Anonymous Posts</h4> <ul>{allPostsLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300"><div>[{log.type}]: {log.text}</div> {log.reply && <div className="mt-2 p-2 bg-slate-600 rounded-lg text-sm text-gray-200"><b>Prof. Ahn's Reply:</b> {log.reply}</div>} </li>)}</ul>
+              </div> }
               <div className="text-left p-4 border border-slate-600 rounded-xl mt-6"> <h3 className="text-xl font-semibold text-gray-100 mb-4">Class Score Range</h3> <TalentGraph talentsData={talentsLog} type="student" selectedCourse={selectedCourse} getFirstName={getFirstName} /> </div>
             </div>
           )}
