@@ -66,7 +66,6 @@ const App = () => {
   const [questionsLog, setQuestionsLog] = useState([]);
   const [feedbackLog, setFeedbackLog] = useState([]);
   const [gradedPosts, setGradedPosts] = useState(new Set());
-  // --- NEW FEATURE: State for all anonymous posts ---
   const [allPostsLog, setAllPostsLog] = useState([]);
   
   const showMessage = useCallback((msg) => { setMessage(msg); setShowMessageBox(true); setTimeout(() => { setShowMessageBox(false); setMessage(''); }, 3000); }, []);
@@ -91,17 +90,14 @@ const App = () => {
     const talentDocRef = doc(db, `/artifacts/${appId}/public/data/talents`, nameInput); const unsubM = onSnapshot(talentDocRef, (d) => setMyTotalTalents(d.exists() ? d.data().totalTalents : 0));
     let unsubA = () => {}, unsubF = () => {}, unsubAll = () => {};
     if (studentSelectedDate) {
-      // Fetch user's own posts
       const activityQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("name", "==", nameInput), where("date", "==", studentSelectedDate));
       unsubA = onSnapshot(activityQuery, (snap) => {
         const activities = snap.docs.map(d => ({id: d.id, ...d.data()}));
         setStudentActivityLog(activities.sort((a,b) => b.timestamp - a.timestamp));
         setDailyProgress({ question_comment: activities.filter(a => a.type === 'question_comment').length, reasoning: activities.filter(a => a.type === 'reasoning').length });
       });
-      // Fetch all anonymous posts for the day
       const allPostsQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("date", "==", studentSelectedDate));
       unsubAll = onSnapshot(allPostsQuery, (snap) => setAllPostsLog(snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => b.timestamp - a.timestamp)));
-
       const feedbackQuery = query(collection(db, `/artifacts/${appId}/public/data/feedback`), where("course", "==", selectedCourse), where("name", "==", nameInput), where("date", "==", studentSelectedDate));
       unsubF = onSnapshot(feedbackQuery, (snap) => setStudentFeedbackLog(snap.docs.map(d => d.data()).sort((a,b) => b.timestamp - a.timestamp)));
     } else { setStudentActivityLog([]); setAllPostsLog([]); setDailyProgress({ question_comment: 0, reasoning: 0 }); setStudentFeedbackLog([]); }
@@ -119,13 +115,13 @@ const App = () => {
   const isReadyToParticipate = isAuthenticated && isClassActive;
 
   const adminDailyProgress = useMemo(() => { const roster = COURSE_STUDENTS[selectedCourse] || []; const initialProgress = roster.reduce((acc, studentName) => { acc[studentName] = { question_comment: 0, reasoning: 0 }; return acc; }, {}); questionsLog.forEach(log => { if (initialProgress[log.name]) { if (log.type === 'question_comment') initialProgress[log.name].question_comment++; if (log.type === 'reasoning') initialProgress[log.name].reasoning++; } }); return initialProgress; }, [questionsLog, selectedCourse]);
-  const ReplyForm = ({ log, onReply }) => { const [replyText, setReplyText] = useState(''); const handleSend = () => { onReply(log.id, replyText); setReplyText(''); }; return ( <div className="mt-2 flex space-x-2"> <input type="text" value={replyText} onChange={(e) => setReplyText(e.target.value)} placeholder={`Reply to ${getFirstName(log.name)}...`} className="flex-1 p-2 border bg-slate-600 border-slate-500 rounded-lg text-sm" /> <button onClick={handleSend} className="p-2 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg">Send</button> </div> ); };
+  const ReplyForm = ({ log, onReply }) => { const [replyText, setReplyText] = useState(''); const handleSend = () => { onReply(log.id, replyText); setReplyText(''); }; return ( <div className="mt-2 flex items-center space-x-2"> <input type="text" value={replyText} onChange={(e) => setReplyText(e.target.value)} placeholder={`Reply to ${getFirstName(log.name)}...`} className="flex-1 p-2 border bg-slate-600 border-slate-500 rounded-lg text-sm" /> <button onClick={handleSend} className="p-2 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg">Send</button> <button onClick={() => onReply(log.id, "Addressed in class")} className="p-2 bg-gray-500 hover:bg-gray-600 text-white text-sm rounded-lg">Addressed in Class</button> </div> ); };
 
   const MainContent = () => (
     <div className="w-full max-w-lg p-6 bg-slate-800 text-white rounded-xl shadow-lg box-shadow-custom">
       {isAdmin ? (
         <>
-          <h1 className="text-3xl font-bold text-center mb-4 text-orange-500">Admin Dashboard</h1>
+          <h1 className="text-3xl font-bold text-center mb-4"><span className="text-orange-500">Ahn</span>stoppable Learning</h1>
           <button onClick={() => setIsAdmin(false)} className="mb-4 p-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700">Back to student view</button>
           <div className="flex flex-wrap justify-center gap-2 mb-6"> {COURSES.map((course) => <button key={course} onClick={() => setSelectedCourse(course)} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)} </div>
           <select value={adminSelectedStudent} onChange={(e) => setAdminSelectedStudent(e.target.value)} className="p-3 mb-6 w-full border bg-slate-700 border-slate-500 rounded-lg text-lg"> <option value="">-- View Daily Log --</option> {COURSE_STUDENTS[selectedCourse].map((name, i) => <option key={i} value={name}>{name}</option>)} </select>
@@ -147,7 +143,7 @@ const App = () => {
         </>
       ) : (
         <>
-          <h1 className="text-3xl font-bold text-center mb-1">Ahnstoppable Learning:<br /><span className="text-orange-500">Freely Ask, Freely Learn</span></h1>
+          <h1 className="text-3xl font-bold text-center mb-1"><span className="text-orange-500">Ahn</span>stoppable Learning:<br />Freely Ask, Freely Learn</h1>
           <div className="flex flex-wrap justify-center gap-2 my-6"> {COURSES.map((course) => <button key={course} onClick={() => { setSelectedCourse(course); handleNameChange(''); }} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)} </div>
           <select value={nameInput} onChange={(e) => handleNameChange(e.target.value)} disabled={isAuthenticated} className="p-3 mb-2 w-full border bg-slate-700 border-slate-500 rounded-lg text-lg disabled:opacity-50"> <option value="">Select your name...</option> {COURSE_STUDENTS[selectedCourse].map((name, i) => <option key={i} value={name}>{name}</option>)} </select>
           {isNameEntered && !isAuthenticated && <PinAuth nameInput={nameInput} isPinRegistered={isPinRegistered} onLogin={handlePinLogin} onRegister={handlePinRegister} getFirstName={getFirstName} />}
@@ -177,8 +173,8 @@ const App = () => {
               {studentSelectedDate && <div className="text-left p-4 border border-slate-600 rounded-xl mt-6"> 
                 <h3 className="text-xl font-semibold">Logs for {studentSelectedDate}</h3> 
                 <h4 className="font-semibold mt-2 text-gray-300">🚦 My Understanding Checks</h4> <ul>{studentFeedbackLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">({log.timestamp?.toDate().toLocaleTimeString()}): {log.status}</li>)}</ul> 
-                <h4 className="font-semibold mt-4 text-gray-300">✍️ My Posts</h4> <ul>{studentActivityLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300"><div>[{log.type}]: {log.text}</div> {log.reply && <div className="mt-2 p-2 bg-slate-600 rounded-lg text-sm text-gray-200 flex justify-between items-center"><span><b>Prof. Ahn's Reply:</b> {log.reply}</span> <button onClick={() => !log.liked && handleLike(log.id)} disabled={log.liked} className="ml-2 text-2xl disabled:opacity-50">{log.liked ? '👍' : '👍'}</button> </div>} </li>)}</ul>
-                <h4 className="font-semibold mt-4 text-gray-300">👀 All Anonymous Posts</h4> <ul>{allPostsLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300"><div>[{log.type}]: {log.text}</div> {log.reply && <div className="mt-2 p-2 bg-slate-600 rounded-lg text-sm text-gray-200"><b>Prof. Ahn's Reply:</b> {log.reply}</div>} </li>)}</ul>
+                <h4 className="font-semibold mt-4 text-gray-300">✍️ My Posts</h4> <ul>{studentActivityLog.map((log) => <li key={log.id} className="p-2 border-b border-slate-700 text-gray-300"><div>[{log.type}]: {log.text}</div> {log.reply && <div className="mt-2 p-2 bg-slate-600 rounded-lg text-sm text-gray-200 flex justify-between items-center"><span><b>Prof. Ahn's Reply:</b> {log.reply}</span> <button onClick={() => !log.liked && handleLike(log.id)} disabled={log.liked} className="ml-2 text-2xl disabled:opacity-50">{log.liked ? '👍' : '👍'}</button> </div>} </li>)}</ul>
+                <h4 className="font-semibold mt-4 text-gray-300">👀 All Anonymous Posts</h4> <ul className="h-40 overflow-y-auto">{allPostsLog.map((log) => <li key={log.id} className="p-2 border-b border-slate-700 text-gray-300"><div>[{log.type}]: {log.text}</div> {log.reply && <div className="mt-2 p-2 bg-slate-600 rounded-lg text-sm text-gray-200"><b>Prof. Ahn's Reply:</b> {log.reply}</div>} </li>)}</ul>
               </div> }
               <div className="text-left p-4 border border-slate-600 rounded-xl mt-6"> <h3 className="text-xl font-semibold text-gray-100 mb-4">Class Score Range</h3> <TalentGraph talentsData={talentsLog} type="student" selectedCourse={selectedCourse} getFirstName={getFirstName} /> </div>
             </div>
