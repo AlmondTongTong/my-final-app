@@ -51,7 +51,7 @@ const App = () => {
   const [showMessageBox, setShowMessageBox] = useState(false);
   const [isClassActive, setIsClassActive] = useState(false);
   const [talentsLog, setTalentsLog] = useState([]);
-  const [studentSelectedDate, setStudentSelectedDate] = useState('');
+  const [studentSelectedDate, setStudentSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [dailyProgress, setDailyProgress] = useState({ question_comment: 0, reasoning: 0 });
   const [myTotalTalents, setMyTotalTalents] = useState(0);
   const [talentTransactions, setTalentTransactions] = useState([]);
@@ -79,26 +79,25 @@ const App = () => {
   useEffect(() => { const checkTime = () => setIsClassActive(isWithinClassTime(selectedCourse)); checkTime(); const interval = setInterval(checkTime, 30000); return () => clearInterval(interval); }, [selectedCourse]);
   useEffect(() => { if (!db) return; const talentsQuery = query(collection(db, `/artifacts/${appId}/public/data/talents`), where("course", "==", selectedCourse)); const unsub = onSnapshot(talentsQuery, (snap) => setTalentsLog(snap.docs.map(d => ({ id: d.id, ...d.data() })))); return () => unsub(); }, [db, selectedCourse, appId]);
 
-  useEffect(() => { if (!db || !isAdmin) return; setGradedPosts(new Set()); const questionsQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("date", "==", adminSelectedDate), orderBy("timestamp", "desc")); const unsubQ = onSnapshot(questionsQuery, (snap) => setQuestionsLog(snap.docs.map(d => ({ id: d.id, ...d.data() })))); const feedbackQuery = query(collection(db, `/artifacts/${appId}/public/data/feedback`), where("course", "==", selectedCourse), where("date", "==", adminSelectedDate), orderBy("timestamp", "desc")); const unsubF = onSnapshot(feedbackQuery, (snap) => setFeedbackLog(snap.docs.map(d => ({ id: d.id, ...d.data() })))); return () => { unsubQ(); unsubF(); }; }, [db, selectedCourse, adminSelectedDate, appId, isAdmin]);
+  useEffect(() => { if (!db || !isAdmin) return; const questionsQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("date", "==", adminSelectedDate), orderBy("timestamp", "desc")); const unsubQ = onSnapshot(questionsQuery, (snap) => setQuestionsLog(snap.docs.map(d => ({ id: d.id, ...d.data() })))); const feedbackQuery = query(collection(db, `/artifacts/${appId}/public/data/feedback`), where("course", "==", selectedCourse), where("date", "==", adminSelectedDate), orderBy("timestamp", "desc")); const unsubF = onSnapshot(feedbackQuery, (snap) => setFeedbackLog(snap.docs.map(d => ({ id: d.id, ...d.data() })))); return () => { unsubQ(); unsubF(); }; }, [db, selectedCourse, adminSelectedDate, appId, isAdmin]);
   useEffect(() => { if (!db || !isAdmin || !adminSelectedStudent) { setAdminStudentLog([]); return; }; const logQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("name", "==", adminSelectedStudent), orderBy("timestamp", "desc")); const unsub = onSnapshot(logQuery, (snap) => setAdminStudentLog(snap.docs.map(d => ({ id: d.id, ...d.data() })))); return () => unsub(); }, [db, selectedCourse, adminSelectedStudent, appId, isAdmin]);
 
   useEffect(() => {
     if (!db || isAdmin || !nameInput || !isAuthenticated) { setStudentActivityLog([]); setAllPostsLog([]); setMyTotalTalents(0); setTalentTransactions([]); setDailyProgress({ question_comment: 0, reasoning: 0 }); setStudentFeedbackLog([]); return; }
     const transactionsQuery = query(collection(db, `/artifacts/${appId}/public/data/talentTransactions`), where("name", "==", nameInput), orderBy("timestamp", "desc")); const unsubT = onSnapshot(transactionsQuery, (snap) => setTalentTransactions(snap.docs.map(d => d.data())));
     const talentDocRef = doc(db, `/artifacts/${appId}/public/data/talents`, nameInput); const unsubM = onSnapshot(talentDocRef, (d) => setMyTotalTalents(d.exists() ? d.data().totalTalents : 0));
-    let unsubA = () => {}, unsubF = () => {}, unsubAll = () => {};
-    if (studentSelectedDate) {
-      const activityQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("name", "==", nameInput), where("date", "==", studentSelectedDate), orderBy("timestamp", "desc"));
-      unsubA = onSnapshot(activityQuery, (snap) => {
-        const activities = snap.docs.map(d => ({id: d.id, ...d.data()}));
-        setStudentActivityLog(activities);
-        setDailyProgress({ question_comment: activities.filter(a => a.type === 'question_comment').length, reasoning: activities.filter(a => a.type === 'reasoning').length });
-      });
-      const allPostsQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("date", "==", studentSelectedDate), orderBy("timestamp", "desc"));
-      unsubAll = onSnapshot(allPostsQuery, (snap) => setAllPostsLog(snap.docs.map(d => ({id: d.id, ...d.data()}))));
-      const feedbackQuery = query(collection(db, `/artifacts/${appId}/public/data/feedback`), where("course", "==", selectedCourse), where("name", "==", nameInput), where("date", "==", studentSelectedDate), orderBy("timestamp", "desc"));
-      unsubF = onSnapshot(feedbackQuery, (snap) => setStudentFeedbackLog(snap.docs.map(d => d.data())));
-    } else { setStudentActivityLog([]); setAllPostsLog([]); setDailyProgress({ question_comment: 0, reasoning: 0 }); setStudentFeedbackLog([]); }
+    
+    const activityQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("name", "==", nameInput), where("date", "==", studentSelectedDate), orderBy("timestamp", "desc"));
+    const unsubA = onSnapshot(activityQuery, (snap) => {
+      const activities = snap.docs.map(d => ({id: d.id, ...d.data()}));
+      setStudentActivityLog(activities);
+      setDailyProgress({ question_comment: activities.filter(a => a.type === 'question_comment').length, reasoning: activities.filter(a => a.type === 'reasoning').length });
+    });
+    const allPostsQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("date", "==", studentSelectedDate), orderBy("timestamp", "desc"));
+    const unsubAll = onSnapshot(allPostsQuery, (snap) => setAllPostsLog(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+    const feedbackQuery = query(collection(db, `/artifacts/${appId}/public/data/feedback`), where("course", "==", selectedCourse), where("name", "==", nameInput), where("date", "==", studentSelectedDate), orderBy("timestamp", "desc"));
+    const unsubF = onSnapshot(feedbackQuery, (snap) => setStudentFeedbackLog(snap.docs.map(d => d.data())));
+
     return () => { unsubA(); unsubM(); unsubT(); unsubF(); unsubAll(); };
   }, [db, selectedCourse, nameInput, studentSelectedDate, appId, isAdmin, isAuthenticated]);
 
