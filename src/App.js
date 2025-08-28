@@ -145,7 +145,7 @@ const App = () => {
       {isAdmin ? (
         <>
           <h1 className="text-5xl font-bold text-center mb-4"><span className="text-green-500">''Ahn''</span>stoppable Learning</h1>
-          <CreatePollForm onCreatePoll={handleCreatePoll} onDeactivatePoll={handleDeactivatePoll} activePoll={activePoll} />
+          <CreatePollForm onCreatePoll={handleCreatePoll} onDeactivatePoll={handleDeactivatePoll} activePoll={activePoll} userVote={userPollVote} />
           <button onClick={() => setIsAdmin(false)} className="mb-4 p-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 text-lg">Back to student view</button>
           <div className="flex flex-wrap justify-center gap-2 mb-6"> {COURSES.map((course) => <button key={course} onClick={() => setSelectedCourse(course)} className={`p-3 text-lg font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)} </div>
           <select value={adminSelectedStudent} onChange={(e) => setAdminSelectedStudent(e.target.value)} className="p-3 mb-6 w-full border bg-slate-700 border-slate-500 rounded-lg text-2xl"> <option value="">-- View All Daily Logs --</option> {COURSE_STUDENTS[selectedCourse].map((name, i) => <option key={i} value={name}>{name}</option>)} </select>
@@ -174,7 +174,7 @@ const App = () => {
       ) : (
         <>
           <h1 className="text-5xl font-bold text-center mb-1"><span className="text-green-500">''Ahn''</span>stoppable Learning:<br /><span className="text-orange-500 text-3xl">Freely Ask, Freely Learn</span></h1>
-          {activePoll && <PollComponent poll={activePoll} onVote={handlePollVote} userVote={userVote} nameInput={nameInput} />}
+          {activePoll && <PollComponent poll={activePoll} onVote={handlePollVote} userVote={userPollVote} nameInput={nameInput} />}
           <div className="flex flex-wrap justify-center gap-2 my-6"> {COURSES.map((course) => <button key={course} onClick={() => { setSelectedCourse(course); handleNameChange(''); }} className={`p-3 text-lg font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)} </div>
           <select value={nameInput} onChange={(e) => handleNameChange(e.target.value)} disabled={isAuthenticated} className="p-3 mb-2 w-full border bg-slate-700 border-slate-500 rounded-lg text-2xl disabled:opacity-50"> <option value="">Select your name...</option> {COURSE_STUDENTS[selectedCourse].map((name, i) => <option key={i} value={name}>{name}</option>)} </select>
           {isNameEntered && !isAuthenticated && <PinAuth nameInput={nameInput} isPinRegistered={isPinRegistered} onLogin={handlePinLogin} onRegister={handlePinRegister} getFirstName={getFirstName} />}
@@ -224,13 +224,13 @@ const App = () => {
     </div>
   );
   
-  const CreatePollForm = ({ onCreatePoll, onDeactivatePoll, activePoll }) => {
+  const CreatePollForm = ({ onCreatePoll, onDeactivatePoll, activePoll, userVote }) => {
     const [question, setQuestion] = useState('');
     const [options, setOptions] = useState(['', '', '']);
     const handleOptionChange = (index, value) => { const newOptions = [...options]; newOptions[index] = value; setOptions(newOptions); };
     const addOption = () => setOptions([...options, '']);
     const handleSubmit = () => { const validOptions = options.filter(opt => opt.trim() !== ''); if (question.trim() && validOptions.length > 1) { onCreatePoll(question, validOptions); setQuestion(''); setOptions(['', '', '']); } else { alert("Please provide a question and at least two options."); } };
-    if (activePoll) { return ( <div className="p-4 border border-slate-600 rounded-xl mb-6"> <h3 className="text-3xl font-semibold">Active Poll Results</h3> <PollComponent poll={activePoll} isAdminView={true} userVote={null} /> <button onClick={() => onDeactivatePoll(activePoll.id)} className="w-full p-2 mt-4 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xl">Close Poll</button> </div> ); }
+    if (activePoll) { return ( <div className="p-4 border border-slate-600 rounded-xl mb-6"> <h3 className="text-3xl font-semibold">Active Poll Results</h3> <PollComponent poll={activePoll} isAdminView={true} userVote={userVote} /> <button onClick={() => onDeactivatePoll(activePoll.id)} className="w-full p-2 mt-4 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xl">Close Poll</button> </div> ); }
     return ( <div className="p-4 border border-slate-600 rounded-xl mb-6"> <h3 className="text-3xl font-semibold mb-2">Create New Poll</h3> <input type="text" value={question} onChange={e => setQuestion(e.target.value)} placeholder="Poll Question" className="w-full p-2 mb-2 bg-slate-700 border border-slate-500 rounded-lg text-xl"/> {options.map((option, index) => ( <input key={index} type="text" value={option} onChange={e => handleOptionChange(index, e.target.value)} placeholder={`Option ${index + 1}`} className="w-full p-2 mb-2 bg-slate-700 border border-slate-500 rounded-lg text-xl"/> ))} <button onClick={addOption} className="text-lg text-blue-400 mb-2">+ Add Option</button> <button onClick={handleSubmit} className="w-full p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xl">Publish Poll</button> </div> );
   };
   
