@@ -108,7 +108,7 @@ const App = () => {
     const unsubF = onSnapshot(feedbackQuery, (snap) => setFeedbackLog(snap.docs.map(d => ({ id: d.id, ...d.data() })))); 
     return () => { unsubQ(); unsubF(); }; 
   }, [db, selectedCourse, adminSelectedDate, appId, isAdmin]);
-
+  
   useEffect(() => { if (!db || !isAdmin || !adminSelectedStudent) { setAdminStudentLog([]); return; }; const logQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("name", "==", adminSelectedStudent), orderBy("timestamp", "desc")); const unsub = onSnapshot(logQuery, (snap) => setAdminStudentLog(snap.docs.map(d => ({ id: d.id, ...d.data() })))); return () => unsub(); }, [db, selectedCourse, adminSelectedStudent, appId, isAdmin]);
 
   useEffect(() => {
@@ -128,7 +128,6 @@ const App = () => {
             snapshot.docChanges().forEach(change => {
                 const data = { id: change.doc.id, ...change.doc.data() };
                 const index = newLogs.findIndex(log => log.id === data.id);
-
                 if (change.type === "added") {
                     if (index === -1) newLogs.push(data);
                 }
