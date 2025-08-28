@@ -86,29 +86,13 @@ const App = () => {
     if (!db || !isAdmin) return; 
     const questionsQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("date", "==", adminSelectedDate), orderBy("timestamp", "desc")); 
     const unsubQ = onSnapshot(questionsQuery, (snapshot) => {
-        setQuestionsLog(prevLogs => {
-            const newLogs = [...prevLogs];
-            snapshot.docChanges().forEach(change => {
-                const data = { id: change.doc.id, ...change.doc.data() };
-                const index = newLogs.findIndex(log => log.id === data.id);
-                if (change.type === "added") {
-                    if (index === -1) { newLogs.unshift(data); }
-                }
-                if (change.type === "modified") {
-                    if (index !== -1) { newLogs[index] = data; }
-                }
-                if (change.type === "removed") {
-                    if (index !== -1) { newLogs.splice(index, 1); }
-                }
-            });
-            return newLogs.sort((a, b) => b.timestamp - a.timestamp);
-        });
+        if (snapshot.metadata.hasPendingWrites) { return; }
+        setQuestionsLog(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     const feedbackQuery = query(collection(db, `/artifacts/${appId}/public/data/feedback`), where("course", "==", selectedCourse), where("date", "==", adminSelectedDate), orderBy("timestamp", "desc")); 
     const unsubF = onSnapshot(feedbackQuery, (snap) => setFeedbackLog(snap.docs.map(d => ({ id: d.id, ...d.data() })))); 
     return () => { unsubQ(); unsubF(); }; 
   }, [db, selectedCourse, adminSelectedDate, appId, isAdmin]);
-
   useEffect(() => { if (!db || !isAdmin || !adminSelectedStudent) { setAdminStudentLog([]); return; }; const logQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("name", "==", adminSelectedStudent), orderBy("timestamp", "desc")); const unsub = onSnapshot(logQuery, (snap) => setAdminStudentLog(snap.docs.map(d => ({ id: d.id, ...d.data() })))); return () => unsub(); }, [db, selectedCourse, adminSelectedStudent, appId, isAdmin]);
 
   useEffect(() => {
@@ -122,25 +106,9 @@ const App = () => {
       setDailyProgress({ question_comment: activities.filter(a => a.type === 'question_comment').length, reasoning: activities.filter(a => a.type === 'reasoning').length });
     });
     const allPostsQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("date", "==", studentSelectedDate), orderBy("timestamp", "desc"));
-    const unsubAll = onSnapshot(allPostsQuery, (snapshot) => {
-        setAllPostsLog(prevLogs => {
-            const newLogs = [...prevLogs];
-            snapshot.docChanges().forEach(change => {
-                const data = { id: change.doc.id, ...change.doc.data() };
-                const index = newLogs.findIndex(log => log.id === data.id);
-
-                if (change.type === "added") {
-                    if (index === -1) newLogs.unshift(data);
-                }
-                if (change.type === "modified") {
-                    if (index !== -1) newLogs[index] = data;
-                }
-                if (change.type === "removed") {
-                    if (index !== -1) newLogs.splice(index, 1);
-                }
-            });
-            return newLogs.sort((a, b) => b.timestamp - a.timestamp);
-        });
+    const unsubAll = onSnapshot(allPostsQuery, (snap) => {
+        if (snap.metadata.hasPendingWrites) { return; }
+        setAllPostsLog(snap.docs.map(d => ({id: d.id, ...d.data()})));
     });
     const feedbackQuery = query(collection(db, `/artifacts/${appId}/public/data/feedback`), where("course", "==", selectedCourse), where("name", "==", nameInput), where("date", "==", studentSelectedDate), orderBy("timestamp", "desc"));
     const unsubF = onSnapshot(feedbackQuery, (snap) => setStudentFeedbackLog(snap.docs.map(d => d.data())));
@@ -279,4 +247,22 @@ const App = () => {
     const addOption = () => setOptions([...options, '']);
     const handleSubmit = () => { const validOptions = options.filter(opt => opt.trim() !== ''); if (question.trim() && validOptions.length > 1) { onCreatePoll(question, validOptions); setQuestion(''); setOptions(['', '', '']); } else { alert("Please provide a question and at least two options."); } };
     if (activePoll) { return ( <div className="p-4 border border-slate-600 rounded-xl mb-6"> <h3 className="text-3xl font-semibold">Active Poll Results</h3> <PollComponent poll={activePoll} isAdminView={true} userVote={null} /> <button onClick={() => onDeactivatePoll(activePoll.id)} className="w-full p-2 mt-4 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xl">Close Poll</button> </div> ); }
-    return ( <div className="p-4 border border-slate-600 rounded-xl mb-6"> <h3 className="text-3xl font-semibold mb-2">Create New Poll</h3> <input type="text" value={question
+    return ( <div className="p-4 border border-slate-600 rounded-xl mb-6"> <h3 className="text-3xl font-semibold mb-2">Create New Poll</h3> <input type="text" value={question} onChange={e => setQuestion(e.target.value)} placeholder="Poll Question" className="w-full p-2 mb-2 bg-slate-700 border border-slate-500 rounded-lg text-xl"/> {options.map((option, index) => ( <input key={index} type="text" value={option} onChange={e => handleOptionChange(index, e.target.value)} placeholder={`Option ${index + 1}`} className="w-full p-2 mb-2 bg-slate-700 border border-slate-500 rounded-lg text-xl"/> ))} <button onClick={addOption} className="text-lg text-blue-400 mb-2">+ Add Option</button> <button onClick={handleSubmit} className="w-full p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xl">Publish Poll</button> </div> );
+  };
+  
+  const PollComponent = ({ poll, onVote, userVote, nameInput, isAdminView = false }) => {
+      const results = useMemo(() => {
+          const responses = poll.responses ? Object.values(poll.responses) : [];
+          const totalVotes = responses.length;
+          const votesPerOption = poll.options.map((_, index) => { return responses.filter(vote => vote === index).length; });
+          return { totalVotes, percentages: votesPerOption.map(count => totalVotes > 0 ? (count / totalVotes) * 100 : 0) };
+      }, [poll]);
+      const hasVoted = userVote !== null;
+      return ( <div className="p-4 border border-orange-500 rounded-xl my-6 bg-slate-700"> <h3 className="text-3xl font-semibold text-orange-400 mb-2">{poll.question}</h3> <div className="space-y-2"> {poll.options.map((option, index) => { const percentage = results.percentages[index] || 0; if (hasVoted || isAdminView) { return ( <div key={index} className="p-2 bg-slate-600 rounded-lg"> <div className="flex justify-between text-white mb-1 text-xl"> <span>{option}</span> <span>{percentage.toFixed(0)}%</span> </div> <div className="w-full bg-slate-500 rounded-full h-5"> <div className="bg-orange-500 h-5 rounded-full" style={{ width: `${percentage}%` }}></div> </div> </div> ) } return ( <button key={index} onClick={() => onVote(poll.id, index)} className="w-full text-left p-3 bg-slate-600 hover:bg-slate-500 rounded-lg text-xl"> {option} </button> ); })} </div> </div> );
+  };
+
+  const PhotoGallery = () => ( <> <div className="flex justify-center items-center gap-2 sm:gap-4 flex-wrap"> {[...Array(7)].map((_, i) => <img key={i} src={`/photo${i + 1}.jpg`} alt={`Gallery ${i + 1}`} className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />)} </div> <div className="flex justify-center items-center flex-grow my-4"><MainContent /></div> <div className="flex justify-center items-center gap-2 sm:gap-4 flex-wrap"> {[...Array(7)].map((_, i) => <img key={i} src={`/photo${i + 8}.jpg`} alt={`Gallery ${i + 8}`} className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />)} </div> </> );
+  return ( <div className="min-h-screen w-full bg-custom-beige-bg flex flex-col justify-between p-2 sm:p-4"> <PhotoGallery /> {showMessageBox && ( <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-900 text-white p-6 rounded-xl text-center z-50 text-2xl"> {message} </div> )} </div> );
+};
+
+export default App;
