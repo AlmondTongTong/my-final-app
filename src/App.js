@@ -95,7 +95,7 @@ const App = () => {
                 else if (change.type === "modified" && index !== -1) { newLogs[index] = data; }
                 else if (change.type === "removed" && index !== -1) { newLogs.splice(index, 1); }
             });
-            return newLogs.sort((a, b) => b.timestamp.seconds - a.timestamp.seconds);
+            return newLogs.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
         });
     });
     const feedbackQuery = query(collection(db, `/artifacts/${appId}/public/data/feedback`), where("course", "==", selectedCourse), where("date", "==", adminSelectedDate), orderBy("timestamp", "desc")); 
@@ -121,12 +121,11 @@ const App = () => {
             snapshot.docChanges().forEach(change => {
                 const data = { id: change.doc.id, ...change.doc.data() };
                 const index = newLogs.findIndex(log => log.id === data.id);
-
                 if (change.type === "added" && index === -1) { newLogs.push(data); }
                 else if (change.type === "modified" && index !== -1) { newLogs[index] = data; }
                 else if (change.type === "removed" && index !== -1) { newLogs.splice(index, 1); }
             });
-            return newLogs.sort((a, b) => b.timestamp.seconds - a.timestamp.seconds);
+            return newLogs.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
         });
     });
     const feedbackQuery = query(collection(db, `/artifacts/${appId}/public/data/feedback`), where("course", "==", selectedCourse), where("name", "==", nameInput), where("date", "==", studentSelectedDate), orderBy("timestamp", "desc"));
