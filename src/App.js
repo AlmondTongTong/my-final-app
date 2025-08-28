@@ -86,13 +86,29 @@ const App = () => {
     if (!db || !isAdmin) return; 
     const questionsQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("date", "==", adminSelectedDate), orderBy("timestamp", "desc")); 
     const unsubQ = onSnapshot(questionsQuery, (snapshot) => {
-        if (snapshot.metadata.hasPendingWrites) { return; }
-        setQuestionsLog(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+        setQuestionsLog(prevLogs => {
+            let newLogs = [...prevLogs];
+            snapshot.docChanges().forEach(change => {
+                const data = { id: change.doc.id, ...change.doc.data() };
+                const index = newLogs.findIndex(log => log.id === data.id);
+                if (change.type === "added") {
+                    if (index === -1) { newLogs.push(data); }
+                }
+                if (change.type === "modified") {
+                    if (index !== -1) { newLogs[index] = data; }
+                }
+                if (change.type === "removed") {
+                    if (index !== -1) { newLogs.splice(index, 1); }
+                }
+            });
+            return newLogs.sort((a, b) => b.timestamp.seconds - a.timestamp.seconds);
+        });
     });
     const feedbackQuery = query(collection(db, `/artifacts/${appId}/public/data/feedback`), where("course", "==", selectedCourse), where("date", "==", adminSelectedDate), orderBy("timestamp", "desc")); 
     const unsubF = onSnapshot(feedbackQuery, (snap) => setFeedbackLog(snap.docs.map(d => ({ id: d.id, ...d.data() })))); 
     return () => { unsubQ(); unsubF(); }; 
   }, [db, selectedCourse, adminSelectedDate, appId, isAdmin]);
+
   useEffect(() => { if (!db || !isAdmin || !adminSelectedStudent) { setAdminStudentLog([]); return; }; const logQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("name", "==", adminSelectedStudent), orderBy("timestamp", "desc")); const unsub = onSnapshot(logQuery, (snap) => setAdminStudentLog(snap.docs.map(d => ({ id: d.id, ...d.data() })))); return () => unsub(); }, [db, selectedCourse, adminSelectedStudent, appId, isAdmin]);
 
   useEffect(() => {
@@ -106,9 +122,25 @@ const App = () => {
       setDailyProgress({ question_comment: activities.filter(a => a.type === 'question_comment').length, reasoning: activities.filter(a => a.type === 'reasoning').length });
     });
     const allPostsQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("date", "==", studentSelectedDate), orderBy("timestamp", "desc"));
-    const unsubAll = onSnapshot(allPostsQuery, (snap) => {
-        if (snap.metadata.hasPendingWrites) { return; }
-        setAllPostsLog(snap.docs.map(d => ({id: d.id, ...d.data()})));
+    const unsubAll = onSnapshot(allPostsQuery, (snapshot) => {
+        setAllPostsLog(prevLogs => {
+            const newLogs = [...prevLogs];
+            snapshot.docChanges().forEach(change => {
+                const data = { id: change.doc.id, ...change.doc.data() };
+                const index = newLogs.findIndex(log => log.id === data.id);
+
+                if (change.type === "added") {
+                    if (index === -1) newLogs.push(data);
+                }
+                if (change.type === "modified") {
+                    if (index !== -1) newLogs[index] = data;
+                }
+                if (change.type === "removed") {
+                    if (index !== -1) newLogs.splice(index, 1);
+                }
+            });
+            return newLogs.sort((a, b) => b.timestamp.seconds - a.timestamp.seconds);
+        });
     });
     const feedbackQuery = query(collection(db, `/artifacts/${appId}/public/data/feedback`), where("course", "==", selectedCourse), where("name", "==", nameInput), where("date", "==", studentSelectedDate), orderBy("timestamp", "desc"));
     const unsubF = onSnapshot(feedbackQuery, (snap) => setStudentFeedbackLog(snap.docs.map(d => d.data())));
