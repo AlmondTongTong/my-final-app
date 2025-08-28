@@ -64,14 +64,10 @@ const App = () => {
   const [questionsLog, setQuestionsLog] = useState([]);
   const [feedbackLog, setFeedbackLog] = useState([]);
   const [allPostsLog, setAllPostsLog] = useState([]);
-  
-  // --- NEW FEATURE: State for Polls ---
   const [activePoll, setActivePoll] = useState(null);
   const [userPollVote, setUserPollVote] = useState(null);
-
-  // --- NEW FEATURE: State for Replies ---
-  const [replies, setReplies] = useState({}); // { postId: [reply1, reply2] }
-  const [showReplies, setShowReplies] = useState({}); // { postId: true/false }
+  const [replies, setReplies] = useState({});
+  const [showReplies, setShowReplies] = useState({});
 
   const showMessage = useCallback((msg) => { setMessage(msg); setShowMessageBox(true); setTimeout(() => { setShowMessageBox(false); setMessage(''); }, 3000); }, []);
   const getFirstName = useCallback((fullName) => { if (!fullName) return ''; const parts = fullName.split(', '); return parts.length > 1 ? parts[1] : parts[0]; }, []);
@@ -106,31 +102,19 @@ const App = () => {
     return () => { unsubA(); unsubM(); unsubT(); unsubF(); unsubAll(); };
   }, [db, selectedCourse, nameInput, studentSelectedDate, appId, isAdmin, isAuthenticated]);
   
-  // --- NEW FEATURE: useEffect for Polls ---
   useEffect(() => {
-    if (!db || !isAuthenticated) {
-        setActivePoll(null);
-        return;
-    }
+    if (!db || !isAuthenticated) { setActivePoll(null); return; }
     const pollQuery = query(collection(db, `/artifacts/${appId}/public/data/polls`), where("course", "==", selectedCourse), where("isActive", "==", true));
     const unsubscribe = onSnapshot(pollQuery, (snapshot) => {
         if (!snapshot.empty) {
             const pollData = snapshot.docs[0].data();
             const pollId = snapshot.docs[0].id;
             setActivePoll({ id: pollId, ...pollData });
-            // Check if current user has voted
-            if (pollData.responses && pollData.responses[nameInput] !== undefined) {
-                setUserPollVote(pollData.responses[nameInput]);
-            } else {
-                setUserPollVote(null);
-            }
-        } else {
-            setActivePoll(null);
-        }
+            if (pollData.responses && pollData.responses[nameInput] !== undefined) { setUserPollVote(pollData.responses[nameInput]); } else { setUserPollVote(null); }
+        } else { setActivePoll(null); }
     });
     return () => unsubscribe();
   }, [db, selectedCourse, isAuthenticated, nameInput, appId]);
-
 
   const modifyTalent = useCallback(async (studentName, amount, type) => { if (!db) return; const talentDocRef = doc(db, `/artifacts/${appId}/public/data/talents`, studentName); const transactionColRef = collection(db, `/artifacts/${appId}/public/data/talentTransactions`); try { const docSnap = await getDoc(talentDocRef); let currentTalents = docSnap.exists() ? docSnap.data().totalTalents || 0 : 0; const newTotal = currentTalents + amount; if (newTotal < 0) { showMessage("Talent cannot go below 0."); return; } if (docSnap.exists()) { await updateDoc(talentDocRef, { totalTalents: newTotal }); } else { await setDoc(talentDocRef, { name: studentName, course: selectedCourse, totalTalents: newTotal }); } if(type !== 'automatic') showMessage(`${getFirstName(studentName)} received ${amount > 0 ? '+1' : '-1'} Talent!`); await addDoc(transactionColRef, { name: studentName, points: amount, type: type, timestamp: serverTimestamp() }); } catch(e) { console.error("Error modifying talent: ", e); } }, [db, appId, selectedCourse, getFirstName, showMessage]);
   const handleAddContent = useCallback(async (text, type) => { if (!db || !nameInput.trim() || !text.trim()) return; const today = new Date().toISOString().slice(0, 10); try { await addDoc(collection(db, `/artifacts/${appId}/public/data/questions`), { name: nameInput, text, type, course: selectedCourse, date: today, timestamp: serverTimestamp(), studentLiked: false, adminLiked: false }); showMessage("Submission complete! ✅"); await modifyTalent(nameInput, 1, 'automatic'); } catch (e) { showMessage("Submission failed. ❌"); } }, [db, nameInput, selectedCourse, appId, modifyTalent, showMessage]);
@@ -139,112 +123,40 @@ const App = () => {
   const handleReply = useCallback(async (logId, replyText) => { if (!db || !replyText.trim()) return; const questionDocRef = doc(db, `/artifacts/${appId}/public/data/questions`, logId); try { await updateDoc(questionDocRef, { reply: replyText }); showMessage("Reply sent!"); } catch (e) { showMessage("Failed to send reply."); console.error(e); } }, [db, appId, showMessage]);
   const handleStudentLike = useCallback(async (logId) => { if(!db) return; const questionDocRef = doc(db, `/artifacts/${appId}/public/data/questions`, logId); try { await updateDoc(questionDocRef, { studentLiked: true }); } catch (e) { console.error("Error (student like):", e) } }, [db, appId]);
   const handleAdminLike = useCallback(async (logId) => { if(!db) return; const questionDocRef = doc(db, `/artifacts/${appId}/public/data/questions`, logId); try { await updateDoc(questionDocRef, { adminLiked: true }); } catch (e) { console.error("Error (admin like):", e) } }, [db, appId]);
-  
-  // --- NEW FEATURE: Functions for Polls ---
-  const handleCreatePoll = useCallback(async (question, options) => {
-    if (!db || !isAdmin) return;
-    try {
-        await addDoc(collection(db, `/artifacts/${appId}/public/data/polls`), {
-            question,
-            options,
-            course: selectedCourse,
-            isActive: true,
-            responses: {},
-            timestamp: serverTimestamp()
-        });
-        showMessage("Poll published successfully!");
-    } catch (error) {
-        showMessage("Error publishing poll.");
-        console.error("Error creating poll: ", error);
-    }
-  }, [db, isAdmin, selectedCourse, appId, showMessage]);
-
-  const handlePollVote = useCallback(async (pollId, optionIndex) => {
-      if (!db || !nameInput) return;
-      const pollDocRef = doc(db, `/artifacts/${appId}/public/data/polls`, pollId);
-      try {
-          await updateDoc(pollDocRef, {
-              [`responses.${nameInput}`]: optionIndex
-          });
-      } catch (error) {
-          console.error("Error voting on poll: ", error);
-      }
-  }, [db, nameInput, appId]);
-
-  const handleDeactivatePoll = useCallback(async (pollId) => {
-      if (!db || !isAdmin) return;
-      const pollDocRef = doc(db, `/artifacts/${appId}/public/data/polls`, pollId);
-      try {
-          await updateDoc(pollDocRef, { isActive: false });
-          showMessage("Poll closed.");
-      } catch (error) {
-          showMessage("Error closing poll.");
-          console.error("Error deactivating poll: ", error);
-      }
-  }, [db, isAdmin, appId, showMessage]);
-
-  // --- NEW FEATURE: Function for Student Replies ---
-  const handleAddReply = useCallback(async (postId, replyText) => {
-    if (!db || !nameInput) return;
-    const repliesColRef = collection(db, `/artifacts/${appId}/public/data/questions/${postId}/replies`);
-    try {
-        await addDoc(repliesColRef, {
-            text: replyText,
-            author: getFirstName(nameInput), // Or simply 'Student' for anonymity
-            timestamp: serverTimestamp()
-        });
-    } catch (error) {
-        console.error("Error adding reply: ", error);
-    }
-  }, [db, nameInput, getFirstName, appId]);
-
-  const toggleReplies = useCallback((postId) => {
-    const isCurrentlyShown = showReplies[postId];
-    setShowReplies(prev => ({ ...prev, [postId]: !isCurrentlyShown }));
-
-    if (!isCurrentlyShown) {
-        const repliesQuery = query(collection(db, `/artifacts/${appId}/public/data/questions/${postId}/replies`), orderBy("timestamp", "asc"));
-        onSnapshot(repliesQuery, (snapshot) => {
-            const fetchedReplies = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-            setReplies(prev => ({ ...prev, [postId]: fetchedReplies }));
-        });
-    }
-  }, [db, showReplies, appId]);
+  const handleCreatePoll = useCallback(async (question, options) => { if (!db || !isAdmin) return; try { await addDoc(collection(db, `/artifacts/${appId}/public/data/polls`), { question, options, course: selectedCourse, isActive: true, responses: {}, timestamp: serverTimestamp() }); showMessage("Poll published successfully!"); } catch (error) { showMessage("Error publishing poll."); console.error("Error creating poll: ", error); } }, [db, isAdmin, selectedCourse, appId, showMessage]);
+  const handlePollVote = useCallback(async (pollId, optionIndex) => { if (!db || !nameInput) return; const pollDocRef = doc(db, `/artifacts/${appId}/public/data/polls`, pollId); try { await updateDoc(pollDocRef, { [`responses.${nameInput}`]: optionIndex }); } catch (error) { console.error("Error voting on poll: ", error); } }, [db, nameInput, appId]);
+  const handleDeactivatePoll = useCallback(async (pollId) => { if (!db || !isAdmin) return; const pollDocRef = doc(db, `/artifacts/${appId}/public/data/polls`, pollId); try { await updateDoc(pollDocRef, { isActive: false }); showMessage("Poll closed."); } catch (error) { showMessage("Error closing poll."); console.error("Error deactivating poll: ", error); } }, [db, isAdmin, appId, showMessage]);
+  const handleAddReply = useCallback(async (postId, replyText) => { if (!db || !nameInput) return; const repliesColRef = collection(db, `/artifacts/${appId}/public/data/questions/${postId}/replies`); try { await addDoc(repliesColRef, { text: replyText, author: getFirstName(nameInput), timestamp: serverTimestamp() }); } catch (error) { console.error("Error adding reply: ", error); } }, [db, nameInput, getFirstName, appId]);
+  const toggleReplies = useCallback((postId) => { const isCurrentlyShown = showReplies[postId]; setShowReplies(prev => ({ ...prev, [postId]: !isCurrentlyShown })); if (!isCurrentlyShown) { const repliesQuery = query(collection(db, `/artifacts/${appId}/public/data/questions/${postId}/replies`), orderBy("timestamp", "asc")); onSnapshot(repliesQuery, (snapshot) => { const fetchedReplies = snapshot.docs.map(d => ({ id: d.id, ...d.data() })); setReplies(prev => ({ ...prev, [postId]: fetchedReplies })); }); } }, [db, showReplies, appId]);
 
   const isNameEntered = nameInput.trim().length > 0;
   const isReadyToParticipate = isAuthenticated && isClassActive;
 
   const adminDailyProgress = useMemo(() => { const roster = COURSE_STUDENTS[selectedCourse] || []; const initialProgress = roster.reduce((acc, studentName) => { acc[studentName] = { question_comment: 0, reasoning: 0 }; return acc; }, {}); questionsLog.forEach(log => { if (initialProgress[log.name]) { if (log.type === 'question_comment') initialProgress[log.name].question_comment++; if (log.type === 'reasoning') initialProgress[log.name].reasoning++; } }); return initialProgress; }, [questionsLog, selectedCourse]);
   const ReplyForm = ({ log, onReply }) => { const [replyText, setReplyText] = useState(''); const handleSend = () => { onReply(log.id, replyText); setReplyText(''); }; return ( <div className="mt-2 flex items-center space-x-2"> <input type="text" value={replyText} onChange={(e) => setReplyText(e.target.value)} placeholder={`Reply to ${getFirstName(log.name)}...`} className="flex-1 p-2 border bg-slate-600 border-slate-500 rounded-lg text-sm" /> <button onClick={handleSend} className="p-2 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg">Send</button> <button onClick={() => onReply(log.id, "Addressed in class")} className="p-2 bg-gray-500 hover:bg-gray-600 text-white text-sm rounded-lg whitespace-nowrap">Addressed in Class</button> </div> ); };
-  
-  // --- NEW FEATURE: Student Reply Form Component ---
-  const StudentReplyForm = ({ postId, onAddReply }) => {
-    const [replyText, setReplyText] = useState('');
-    const handleSend = () => { onAddReply(postId, replyText); setReplyText(''); };
-    return ( <div className="mt-2 flex items-center space-x-2"> <input type="text" value={replyText} onChange={(e) => setReplyText(e.target.value)} placeholder="Write a reply..." className="flex-1 p-2 border bg-slate-600 border-slate-500 rounded-lg text-sm" /> <button onClick={handleSend} className="p-2 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg">Reply</button> </div> );
-  };
+  const StudentReplyForm = ({ postId, onAddReply }) => { const [replyText, setReplyText] = useState(''); const handleSend = () => { onAddReply(postId, replyText); setReplyText(''); }; return ( <div className="mt-2 flex items-center space-x-2"> <input type="text" value={replyText} onChange={(e) => setReplyText(e.target.value)} placeholder="Write an anonymous reply..." className="flex-1 p-2 border bg-slate-600 border-slate-500 rounded-lg text-sm" /> <button onClick={handleSend} className="p-2 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg">Reply</button> </div> ); };
 
   const MainContent = () => (
-    <div className="w-full max-w-lg p-6 bg-slate-800 text-white rounded-xl shadow-lg box-shadow-custom">
+    <div className="w-full max-w-4xl p-6 bg-slate-800 text-white rounded-xl shadow-lg box-shadow-custom">
       {isAdmin ? (
         <>
           <h1 className="text-3xl font-bold text-center mb-4"><span className="text-green-500">''Ahn''</span>stoppable Learning</h1>
           <CreatePollForm onCreatePoll={handleCreatePoll} onDeactivatePoll={handleDeactivatePoll} activePoll={activePoll} />
           <button onClick={() => setIsAdmin(false)} className="mb-4 p-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700">Back to student view</button>
           <div className="flex flex-wrap justify-center gap-2 mb-6"> {COURSES.map((course) => <button key={course} onClick={() => setSelectedCourse(course)} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)} </div>
-          <select value={adminSelectedStudent} onChange={(e) => setAdminSelectedStudent(e.target.value)} className="p-3 mb-6 w-full border bg-slate-700 border-slate-500 rounded-lg text-lg"> <option value="">-- View Daily Log --</option> {COURSE_STUDENTS[selectedCourse].map((name, i) => <option key={i} value={name}>{name}</option>)} </select>
+          <select value={adminSelectedStudent} onChange={(e) => setAdminSelectedStudent(e.target.value)} className="p-3 mb-6 w-full border bg-slate-700 border-slate-500 rounded-lg text-lg"> <option value="">-- View All Daily Logs --</option> {COURSE_STUDENTS[selectedCourse].map((name, i) => <option key={i} value={name}>{name}</option>)} </select>
           {adminSelectedStudent ? (
             <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
               <h3 className="text-xl font-semibold">All Logs for {getFirstName(adminSelectedStudent)}</h3>
               <div className="flex justify-center items-center text-center my-4 p-3 bg-yellow-400 text-black rounded-lg"> <img src="/talent-coin.png" alt="Talent coin" className="w-6 h-6 mr-2" /> <p className="font-bold text-lg">Total Talents: {talentsLog.find(t => t.id === adminSelectedStudent)?.totalTalents || 0}</p> </div>
-              <ul>{adminStudentLog.map((log) => ( <li key={log.id} className="p-2 border-b border-slate-700 text-gray-300"> <div className="flex justify-between items-start"> <span className="flex-1 mr-2"><span className="font-bold">{log.date}</span> [{log.type}]: {log.text}</span> <div className="flex items-center space-x-2 flex-shrink-0"> {log.adminLiked ? <span className="text-green-500 font-bold">✓ Liked</span> : <button onClick={() => handleAdminLike(log.id)} className="text-2xl">👍</button>} <button onClick={() => modifyTalent(log.name, -1, 'penalty')} className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700">-1</button> <button onClick={() => modifyTalent(log.name, 1, 'bonus')} className="px-2 py-1 bg-yellow-500 text-black text-xs font-bold rounded hover:bg-yellow-600">+1</button> </div> </div> {log.reply && <div className="mt-2 p-2 bg-slate-700 rounded-lg text-sm text-gray-300"><b>Reply:</b> {log.reply} {log.studentLiked && <span className="ml-2">👍 by student</span>}</div>} <ReplyForm log={log} onReply={handleReply} /> </li> ))}</ul>
+              <ul>{adminStudentLog.map((log) => ( <li key={log.id} className="p-2 border-b border-slate-700"> <div className="flex justify-between items-start"> <span className="flex-1 mr-2"><span className="font-bold">{log.date}</span> [{log.type}]: {log.text}</span> <div className="flex items-center space-x-2 flex-shrink-0"> {log.adminLiked ? <span className="text-green-500 font-bold">✓ Liked</span> : <button onClick={() => handleAdminLike(log.id)} className="text-2xl">👍</button>} <button onClick={() => modifyTalent(log.name, -1, 'penalty')} className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700">-1</button> <button onClick={() => modifyTalent(log.name, 1, 'bonus')} className="px-2 py-1 bg-yellow-500 text-black text-xs font-bold rounded hover:bg-yellow-600">+1</button> </div> </div> {log.reply && <div className="mt-2 p-2 bg-slate-700 rounded-lg text-sm text-gray-300"><b>Reply:</b> {log.reply} {log.studentLiked && <span className="ml-2">👍 by student</span>}</div>} <ReplyForm log={log} onReply={handleReply} /> </li> ))}</ul>
             </div>
           ) : (
             <>
               <div className="flex justify-center items-center space-x-2 mb-6"> <label className="text-gray-300 text-lg">View Logs for Date:</label> <input type="date" value={adminSelectedDate} onChange={(e) => setAdminSelectedDate(e.target.value)} className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-lg"/> </div>
               <div className="text-left p-4 border border-slate-600 rounded-xl mt-6"> <h3 className="text-xl font-semibold mb-2">Daily Requirement Progress</h3> <ul className="space-y-1 text-sm h-40 overflow-y-auto">{Object.entries(adminDailyProgress).map(([name, progress]) => { const qcMet = progress.question_comment >= 2; const rMet = progress.reasoning >= 2; return ( <li key={name} className="flex justify-between items-center pr-2"> <span>{getFirstName(name)}:</span> <span> <span className={qcMet ? 'text-green-400' : 'text-red-400'}>{qcMet ? '✅' : '❌'} {progress.question_comment}/2 Q/C</span> / <span className={rMet ? 'text-green-400' : 'text-red-400'}>{rMet ? '✅' : '❌'} {progress.reasoning}/2 R</span> </span> </li> ); })}</ul> </div>
-              <div className="text-left p-4 border border-slate-600 rounded-xl mt-6"> <h3 className="text-xl font-semibold">🚦 Daily Understanding Check</h3> <ul className="h-24 overflow-y-auto">{feedbackLog.map((log) => ( <li key={log.id} className="p-2 border-b border-slate-700 text-gray-300">({log.timestamp?.toDate().toLocaleTimeString()}) {getFirstName(log.name)}: {log.status}</li> ))}</ul> </div>
-              <div className="text-left p-4 border border-slate-600 rounded-xl mt-6"> <h3 className="text-xl font-semibold">❓ Daily Posts</h3> <ul>{questionsLog.map((log) => ( <li key={log.id} className="p-2 border-b border-slate-700 text-gray-300"> <div className="flex justify-between items-start"> <span className="flex-1 mr-2">{getFirstName(log.name)} [{log.type}]: {log.text}</span> <div className="flex items-center space-x-2 flex-shrink-0"> {log.adminLiked ? <span className="text-green-500 font-bold">✓ Liked</span> : <button onClick={() => handleAdminLike(log.id)} className="text-2xl">👍</button>} <button onClick={() => modifyTalent(log.name, -1, 'penalty')} className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700">-1</button> <button onClick={() => modifyTalent(log.name, 1, 'bonus')} className="px-2 py-1 bg-yellow-500 text-black text-xs font-bold rounded hover:bg-yellow-600">+1</button> </div> </div> {log.reply && <div className="mt-2 p-2 bg-slate-700 rounded-lg text-sm text-gray-300"><b>Reply:</b> {log.reply} {log.studentLiked && <span className="ml-2">👍 by student</span>}</div>} <ReplyForm log={log} onReply={handleReply} /> </li> ))}</ul> </div>
+              <div className="text-left p-4 border border-slate-600 rounded-xl mt-6"> <h3 className="text-xl font-semibold">🚦 Daily Understanding Check</h3> <ul className="h-24 overflow-y-auto">{feedbackLog.map((log) => ( <li key={log.id} className="p-2 border-b border-slate-700">({log.timestamp?.toDate().toLocaleTimeString()}) {getFirstName(log.name)}: {log.status}</li> ))}</ul> </div>
+              <div className="text-left p-4 border border-slate-600 rounded-xl mt-6"> <h3 className="text-xl font-semibold">❓ Daily Posts</h3> <ul className="h-96 overflow-y-auto">{questionsLog.map((log) => ( <li key={log.id} className="p-2 border-b border-slate-700"> <div className="flex justify-between items-start"> <span className="flex-1 mr-2">{getFirstName(log.name)} [{log.type}]: {log.text}</span> <div className="flex items-center space-x-2 flex-shrink-0"> {log.adminLiked ? <span className="text-green-500 font-bold">✓ Liked</span> : <button onClick={() => handleAdminLike(log.id)} className="text-2xl">👍</button>} <button onClick={() => modifyTalent(log.name, -1, 'penalty')} className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700">-1</button> <button onClick={() => modifyTalent(log.name, 1, 'bonus')} className="px-2 py-1 bg-yellow-500 text-black text-xs font-bold rounded hover:bg-yellow-600">+1</button> </div> </div> {log.reply && <div className="mt-2 p-2 bg-slate-700 rounded-lg text-sm text-gray-300"><b>Reply:</b> {log.reply} {log.studentLiked && <span className="ml-2">👍 by student</span>}</div>} <ReplyForm log={log} onReply={handleReply} /> </li> ))}</ul> </div>
             </>
           )}
           <div className="text-left p-4 border border-slate-600 rounded-xl mt-6"> <h3 className="text-xl font-semibold text-gray-100 mb-4">🏆 {selectedCourse} Talent Leaderboard</h3> <TalentGraph talentsData={talentsLog} type="admin" selectedCourse={selectedCourse} getFirstName={getFirstName} /> </div>
@@ -252,7 +164,7 @@ const App = () => {
       ) : (
         <>
           <h1 className="text-3xl font-bold text-center mb-1"><span className="text-green-500">''Ahn''</span>stoppable Learning:<br /><span className="text-orange-500">Freely Ask, Freely Learn</span></h1>
-          {activePoll && <PollComponent poll={activePoll} onVote={handlePollVote} userVote={userPollVote} />}
+          {activePoll && <PollComponent poll={activePoll} onVote={handlePollVote} userVote={userPollVote} nameInput={nameInput} />}
           <div className="flex flex-wrap justify-center gap-2 my-6"> {COURSES.map((course) => <button key={course} onClick={() => { setSelectedCourse(course); handleNameChange(''); }} className={`p-3 text-sm font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)} </div>
           <select value={nameInput} onChange={(e) => handleNameChange(e.target.value)} disabled={isAuthenticated} className="p-3 mb-2 w-full border bg-slate-700 border-slate-500 rounded-lg text-lg disabled:opacity-50"> <option value="">Select your name...</option> {COURSE_STUDENTS[selectedCourse].map((name, i) => <option key={i} value={name}>{name}</option>)} </select>
           {isNameEntered && !isAuthenticated && <PinAuth nameInput={nameInput} isPinRegistered={isPinRegistered} onLogin={handlePinLogin} onRegister={handlePinRegister} getFirstName={getFirstName} />}
@@ -279,8 +191,8 @@ const App = () => {
               {studentSelectedDate && <div className="text-left p-4 border border-slate-600 rounded-xl mt-6"> 
                 <h3 className="text-xl font-semibold">Logs for {studentSelectedDate}</h3> 
                 <h4 className="font-semibold mt-2 text-gray-300">🚦 My Understanding Checks</h4> <ul>{studentFeedbackLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">({log.timestamp?.toDate().toLocaleTimeString()}): {log.status}</li>)}</ul> 
-                <h4 className="font-semibold mt-4 text-gray-300">✍️ My Posts</h4> <ul>{studentActivityLog.map((log) => <li key={log.id} className="p-2 border-b border-slate-700 text-gray-300"><div>{log.adminLiked && <span className="mr-2 text-yellow-400">👍 by Prof. Ahn</span>}[{log.type}]: {log.text}</div> {log.reply && <div className="mt-2 p-2 bg-slate-600 rounded-lg text-sm text-gray-200 flex justify-between items-center"><span><b>Prof. Ahn's Reply:</b> {log.reply}</span> <button onClick={() => !log.studentLiked && handleStudentLike(log.id)} disabled={log.studentLiked} className="ml-2 text-2xl disabled:opacity-50">{log.studentLiked ? '👍 Liked' : '👍'}</button> </div>} <button onClick={() => toggleReplies(log.id)} className="text-xs text-blue-400 mt-1">{showReplies[log.id] ? 'Hide Replies' : 'Show Replies'}</button> {showReplies[log.id] && <div className="mt-2 pl-4 border-l-2 border-slate-500"><StudentReplyForm postId={log.id} onAddReply={handleAddReply} /> <ul className="text-xs mt-2">{replies[log.id]?.map(reply => <li key={reply.id} className="pt-1">{reply.text}</li>)}</ul></div>} </li>)}</ul>
-                <h4 className="font-semibold mt-4 text-gray-300">👀 All Anonymous Posts</h4> <ul className="h-40 overflow-y-auto">{allPostsLog.map((log) => <li key={log.id} className="p-2 border-b border-slate-700 text-gray-300"><div>{log.adminLiked && <span className="mr-2">👍</span>}[{log.type}]: {log.text}</div> {log.reply && <div className="mt-2 p-2 bg-slate-600 rounded-lg text-sm text-gray-200"><b>Prof. Ahn's Reply:</b> {log.reply}</div>} <button onClick={() => toggleReplies(log.id)} className="text-xs text-blue-400 mt-1">{showReplies[log.id] ? 'Hide Replies' : 'Show Replies'}</button> {showReplies[log.id] && <div className="mt-2 pl-4 border-l-2 border-slate-500"><StudentReplyForm postId={log.id} onAddReply={handleAddReply} /> <ul className="text-xs mt-2">{replies[log.id]?.map(reply => <li key={reply.id} className="pt-1">{reply.text}</li>)}</ul></div>} </li>)}</ul>
+                <h4 className="font-semibold mt-4 text-gray-300">✍️ My Posts</h4> <ul>{studentActivityLog.map((log) => <li key={log.id} className="p-2 border-b border-slate-700"><div>{log.adminLiked && <span className="mr-2 text-yellow-400">👍 by Prof. Ahn</span>}[{log.type}]: {log.text}</div> {log.reply && <div className="mt-2 p-2 bg-slate-600 rounded-lg text-sm text-gray-200 flex justify-between items-center"><span><b>Prof. Ahn's Reply:</b> {log.reply}</span> <button onClick={() => !log.studentLiked && handleStudentLike(log.id)} disabled={log.studentLiked} className="ml-2 text-2xl disabled:opacity-50">{log.studentLiked ? '👍 Liked' : '👍'}</button> </div>} <button onClick={() => toggleReplies(log.id)} className="text-xs text-blue-400 mt-1">{showReplies[log.id] ? 'Hide Replies' : 'Show Replies'}</button> {showReplies[log.id] && <div className="mt-2 pl-4 border-l-2 border-slate-500"><StudentReplyForm postId={log.id} onAddReply={handleAddReply} /> <ul className="text-xs mt-2">{replies[log.id]?.map(reply => <li key={reply.id} className="pt-1">{reply.text}</li>)}</ul></div>} </li>)}</ul>
+                <h4 className="font-semibold mt-4 text-gray-300">👀 All Anonymous Posts</h4> <ul className="h-40 overflow-y-auto">{allPostsLog.map((log) => <li key={log.id} className="p-2 border-b border-slate-700"><div>{log.adminLiked && <span className="mr-2">👍</span>}[{log.type}]: {log.text}</div> {log.reply && <div className="mt-2 p-2 bg-slate-600 rounded-lg text-sm text-gray-200"><b>Prof. Ahn's Reply:</b> {log.reply}</div>} <button onClick={() => toggleReplies(log.id)} className="text-xs text-blue-400 mt-1">{showReplies[log.id] ? 'Hide Replies' : 'Show Replies'}</button> {showReplies[log.id] && <div className="mt-2 pl-4 border-l-2 border-slate-500"><StudentReplyForm postId={log.id} onAddReply={handleAddReply} /> <ul className="text-xs mt-2">{replies[log.id]?.map(reply => <li key={reply.id} className="pt-1">{reply.text}</li>)}</ul></div>} </li>)}</ul>
               </div> }
               <div className="text-left p-4 border border-slate-600 rounded-xl mt-6"> <h3 className="text-xl font-semibold text-gray-100 mb-4">Class Score Range</h3> <TalentGraph talentsData={talentsLog} type="student" selectedCourse={selectedCourse} getFirstName={getFirstName} /> </div>
             </div>
@@ -291,96 +203,25 @@ const App = () => {
     </div>
   );
   
-  // --- NEW FEATURE: Poll Components ---
   const CreatePollForm = ({ onCreatePoll, onDeactivatePoll, activePoll }) => {
     const [question, setQuestion] = useState('');
     const [options, setOptions] = useState(['', '', '']);
-
-    const handleOptionChange = (index, value) => {
-        const newOptions = [...options];
-        newOptions[index] = value;
-        setOptions(newOptions);
-    };
-
+    const handleOptionChange = (index, value) => { const newOptions = [...options]; newOptions[index] = value; setOptions(newOptions); };
     const addOption = () => setOptions([...options, '']);
-
-    const handleSubmit = () => {
-        const validOptions = options.filter(opt => opt.trim() !== '');
-        if (question.trim() && validOptions.length > 1) {
-            onCreatePoll(question, validOptions);
-            setQuestion('');
-            setOptions(['', '', '']);
-        } else {
-            alert("Please provide a question and at least two options.");
-        }
-    };
-
-    if (activePoll) {
-        return (
-            <div className="p-4 border border-slate-600 rounded-xl mb-6">
-                <h3 className="text-xl font-semibold">Active Poll Results</h3>
-                <PollComponent poll={activePoll} isAdminView={true} />
-                <button onClick={() => onDeactivatePoll(activePoll.id)} className="w-full p-2 mt-4 bg-red-600 hover:bg-red-700 text-white rounded-lg">Close Poll</button>
-            </div>
-        );
-    }
-
-    return (
-        <div className="p-4 border border-slate-600 rounded-xl mb-6">
-            <h3 className="text-xl font-semibold mb-2">Create New Poll</h3>
-            <input type="text" value={question} onChange={e => setQuestion(e.target.value)} placeholder="Poll Question" className="w-full p-2 mb-2 bg-slate-700 border border-slate-500 rounded-lg"/>
-            {options.map((option, index) => (
-                <input key={index} type="text" value={option} onChange={e => handleOptionChange(index, e.target.value)} placeholder={`Option ${index + 1}`} className="w-full p-2 mb-2 bg-slate-700 border border-slate-500 rounded-lg"/>
-            ))}
-            <button onClick={addOption} className="text-sm text-blue-400 mb-2">+ Add Option</button>
-            <button onClick={handleSubmit} className="w-full p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg">Publish Poll</button>
-        </div>
-    );
+    const handleSubmit = () => { const validOptions = options.filter(opt => opt.trim() !== ''); if (question.trim() && validOptions.length > 1) { onCreatePoll(question, validOptions); setQuestion(''); setOptions(['', '', '']); } else { alert("Please provide a question and at least two options."); } };
+    if (activePoll) { return ( <div className="p-4 border border-slate-600 rounded-xl mb-6"> <h3 className="text-xl font-semibold">Active Poll Results</h3> <PollComponent poll={activePoll} isAdminView={true} /> <button onClick={() => onDeactivatePoll(activePoll.id)} className="w-full p-2 mt-4 bg-red-600 hover:bg-red-700 text-white rounded-lg">Close Poll</button> </div> ); }
+    return ( <div className="p-4 border border-slate-600 rounded-xl mb-6"> <h3 className="text-xl font-semibold mb-2">Create New Poll</h3> <input type="text" value={question} onChange={e => setQuestion(e.target.value)} placeholder="Poll Question" className="w-full p-2 mb-2 bg-slate-700 border border-slate-500 rounded-lg"/> {options.map((option, index) => ( <input key={index} type="text" value={option} onChange={e => handleOptionChange(index, e.target.value)} placeholder={`Option ${index + 1}`} className="w-full p-2 mb-2 bg-slate-700 border border-slate-500 rounded-lg"/> ))} <button onClick={addOption} className="text-sm text-blue-400 mb-2">+ Add Option</button> <button onClick={handleSubmit} className="w-full p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg">Publish Poll</button> </div> );
   };
   
-  const PollComponent = ({ poll, onVote, userVote, isAdminView = false }) => {
+  const PollComponent = ({ poll, onVote, userVote, nameInput, isAdminView = false }) => {
       const results = useMemo(() => {
           const responses = poll.responses ? Object.values(poll.responses) : [];
           const totalVotes = responses.length;
-          const votesPerOption = poll.options.map((_, index) => {
-              return responses.filter(vote => vote === index).length;
-          });
-          return {
-              totalVotes,
-              percentages: votesPerOption.map(count => totalVotes > 0 ? (count / totalVotes) * 100 : 0)
-          };
+          const votesPerOption = poll.options.map((_, index) => { return responses.filter(vote => vote === index).length; });
+          return { totalVotes, percentages: votesPerOption.map(count => totalVotes > 0 ? (count / totalVotes) * 100 : 0) };
       }, [poll]);
-      
       const hasVoted = userVote !== null;
-
-      return (
-          <div className="p-4 border border-orange-500 rounded-xl my-6 bg-slate-700">
-              <h3 className="text-xl font-semibold text-orange-400 mb-2">{poll.question}</h3>
-              <div className="space-y-2">
-                  {poll.options.map((option, index) => {
-                      const percentage = results.percentages[index] || 0;
-                      if (hasVoted || isAdminView) {
-                          return (
-                              <div key={index} className="p-2 bg-slate-600 rounded-lg">
-                                  <div className="flex justify-between text-white mb-1">
-                                      <span>{option}</span>
-                                      <span>{percentage.toFixed(0)}%</span>
-                                  </div>
-                                  <div className="w-full bg-slate-500 rounded-full h-4">
-                                      <div className="bg-orange-500 h-4 rounded-full" style={{ width: `${percentage}%` }}></div>
-                                  </div>
-                              </div>
-                          )
-                      }
-                      return (
-                          <button key={index} onClick={() => onVote(poll.id, index)} className="w-full text-left p-3 bg-slate-600 hover:bg-slate-500 rounded-lg">
-                              {option}
-                          </button>
-                      );
-                  })}
-              </div>
-          </div>
-      );
+      return ( <div className="p-4 border border-orange-500 rounded-xl my-6 bg-slate-700"> <h3 className="text-xl font-semibold text-orange-400 mb-2">{poll.question}</h3> <div className="space-y-2"> {poll.options.map((option, index) => { const percentage = results.percentages[index] || 0; if (hasVoted || isAdminView) { return ( <div key={index} className="p-2 bg-slate-600 rounded-lg"> <div className="flex justify-between text-white mb-1"> <span>{option}</span> <span>{percentage.toFixed(0)}%</span> </div> <div className="w-full bg-slate-500 rounded-full h-4"> <div className="bg-orange-500 h-4 rounded-full" style={{ width: `${percentage}%` }}></div> </div> </div> ) } return ( <button key={index} onClick={() => onVote(poll.id, index)} className="w-full text-left p-3 bg-slate-600 hover:bg-slate-500 rounded-lg"> {option} </button> ); })} </div> </div> );
   };
 
   const PhotoGallery = () => ( <> <div className="flex justify-center items-center gap-2 sm:gap-4 flex-wrap"> {[...Array(7)].map((_, i) => <img key={i} src={`/photo${i + 1}.jpg`} alt={`Gallery ${i + 1}`} className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />)} </div> <div className="flex justify-center items-center flex-grow my-4"><MainContent /></div> <div className="flex justify-center items-center gap-2 sm:gap-4 flex-wrap"> {[...Array(7)].map((_, i) => <img key={i} src={`/photo${i + 8}.jpg`} alt={`Gallery ${i + 8}`} className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />)} </div> </> );
