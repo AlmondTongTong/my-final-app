@@ -68,6 +68,8 @@ const App = () => {
   const [userPollVote, setUserPollVote] = useState(null);
   const [replies, setReplies] = useState({});
   const [showReplies, setShowReplies] = useState({});
+  const [isAdminAnonymousMode, setIsAdminAnonymousMode] = useState(false);
+  const [verbalParticipationCount, setVerbalParticipationCount] = useState(0);
 
   const showMessage = useCallback((msg) => { setMessage(msg); setShowMessageBox(true); setTimeout(() => { setShowMessageBox(false); setMessage(''); }, 3000); }, []);
   const getFirstName = useCallback((fullName) => { if (!fullName) return ''; const parts = fullName.split(', '); return parts.length > 1 ? parts[1] : parts[0]; }, []);
@@ -87,7 +89,7 @@ const App = () => {
     const questionsQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("date", "==", adminSelectedDate), orderBy("timestamp", "desc")); 
     const unsubQ = onSnapshot(questionsQuery, (snapshot) => {
         setQuestionsLog(prevLogs => {
-            const newLogs = [...prevLogs];
+            let newLogs = [...prevLogs];
             snapshot.docChanges().forEach(change => {
                 const data = { id: change.doc.id, ...change.doc.data() };
                 const index = newLogs.findIndex(log => log.id === data.id);
@@ -106,7 +108,13 @@ const App = () => {
 
   useEffect(() => {
     if (!db || isAdmin || !nameInput || !isAuthenticated) { setStudentActivityLog([]); setAllPostsLog([]); setMyTotalTalents(0); setTalentTransactions([]); setDailyProgress({ question_comment: 0, reasoning: 0 }); setStudentFeedbackLog([]); return; }
-    const transactionsQuery = query(collection(db, `/artifacts/${appId}/public/data/talentTransactions`), where("name", "==", nameInput), orderBy("timestamp", "desc")); const unsubT = onSnapshot(transactionsQuery, (snap) => setTalentTransactions(snap.docs.map(d => d.data())));
+    const transactionsQuery = query(collection(db, `/artifacts/${appId}/public/data/talentTransactions`), where("name", "==", nameInput), orderBy("timestamp", "desc")); 
+    const unsubT = onSnapshot(transactionsQuery, (snap) => {
+        const today = new Date().toISOString().slice(0, 10);
+        const todaysTransactions = snap.docs.map(d => d.data()).filter(t => t.timestamp?.toDate().toISOString().slice(0, 10) === today);
+        setTalentTransactions(todaysTransactions);
+        setVerbalParticipationCount(todaysTransactions.filter(t => t.type === 'verbal_participation').length);
+    });
     const talentDocRef = doc(db, `/artifacts/${appId}/public/data/talents`, nameInput); const unsubM = onSnapshot(talentDocRef, (d) => setMyTotalTalents(d.exists() ? d.data().totalTalents : 0));
     const activityQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("name", "==", nameInput), where("date", "==", studentSelectedDate), orderBy("timestamp", "desc"));
     const unsubA = onSnapshot(activityQuery, (snap) => {
@@ -121,7 +129,6 @@ const App = () => {
             snapshot.docChanges().forEach(change => {
                 const data = { id: change.doc.id, ...change.doc.data() };
                 const index = newLogs.findIndex(log => log.id === data.id);
-
                 if (change.type === "added" && index === -1) { newLogs.push(data); }
                 else if (change.type === "modified" && index !== -1) { newLogs[index] = data; }
                 else if (change.type === "removed" && index !== -1) { newLogs.splice(index, 1); }
@@ -160,7 +167,8 @@ const App = () => {
   const handleDeactivatePoll = useCallback(async (pollId) => { if (!db || !isAdmin) return; const pollDocRef = doc(db, `/artifacts/${appId}/public/data/polls`, pollId); try { await updateDoc(pollDocRef, { isActive: false }); showMessage("Poll closed."); } catch (error) { showMessage("Error closing poll."); console.error("Error deactivating poll: ", error); } }, [db, isAdmin, appId, showMessage]);
   const handleAddReply = useCallback(async (postId, replyText) => { if (!db || !nameInput) return; const repliesColRef = collection(db, `/artifacts/${appId}/public/data/questions/${postId}/replies`); try { await addDoc(repliesColRef, { text: replyText, author: getFirstName(nameInput), authorFullName: nameInput, adminLiked: false, timestamp: serverTimestamp() }); await modifyTalent(nameInput, 1, 'peer_reply'); } catch (error) { console.error("Error adding reply: ", error); } }, [db, nameInput, getFirstName, appId, modifyTalent]);
   const toggleReplies = useCallback((postId) => { const isCurrentlyShown = showReplies[postId]; setShowReplies(prev => ({ ...prev, [postId]: !isCurrentlyShown })); if (!isCurrentlyShown) { const repliesQuery = query(collection(db, `/artifacts/${appId}/public/data/questions/${postId}/replies`), orderBy("timestamp", "asc")); onSnapshot(repliesQuery, (snapshot) => { const fetchedReplies = snapshot.docs.map(d => ({ id: d.id, ...d.data() })); setReplies(prev => ({ ...prev, [postId]: fetchedReplies })); }); } }, [db, showReplies, appId]);
-
+  const handleVerbalParticipation = useCallback(() => { if (!db || !nameInput) return; modifyTalent(nameInput, 1, 'verbal_participation'); }, [db, nameInput, modifyTalent]);
+  
   const isNameEntered = nameInput.trim().length > 0;
   const isReadyToParticipate = isAuthenticated && isClassActive;
 
@@ -175,12 +183,15 @@ const App = () => {
         <>
           <h1 className="text-5xl font-bold text-center mb-4"><span className="text-green-500">''Ahn''</span>stoppable Learning</h1>
           <CreatePollForm onCreatePoll={handleCreatePoll} onDeactivatePoll={handleDeactivatePoll} activePoll={activePoll} />
-          <button onClick={() => setIsAdmin(false)} className="mb-4 p-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 text-lg">Back to student view</button>
+          <div className="flex justify-between items-center mb-4">
+            <button onClick={() => setIsAdmin(false)} className="p-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 text-lg">Back to student view</button>
+            <button onClick={() => setIsAdminAnonymousMode(!isAdminAnonymousMode)} className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-lg">{isAdminAnonymousMode ? "Show Student Names" : "Hide Student Names"}</button>
+          </div>
           <div className="flex flex-wrap justify-center gap-2 mb-6"> {COURSES.map((course) => <button key={course} onClick={() => setSelectedCourse(course)} className={`p-3 text-lg font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>{course}</button>)} </div>
           <select value={adminSelectedStudent} onChange={(e) => setAdminSelectedStudent(e.target.value)} className="p-3 mb-6 w-full border bg-slate-700 border-slate-500 rounded-lg text-2xl"> <option value="">-- View All Daily Logs --</option> {COURSE_STUDENTS[selectedCourse].map((name, i) => <option key={i} value={name}>{name}</option>)} </select>
           {adminSelectedStudent ? (
             <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
-              <h3 className="text-3xl font-semibold">All Logs for {getFirstName(adminSelectedStudent)}</h3>
+              <h3 className="text-3xl font-semibold">All Logs for {isAdminAnonymousMode ? "Anonymous" : getFirstName(adminSelectedStudent)}</h3>
               <div className="flex justify-center items-center text-center my-4 p-3 bg-yellow-400 text-black rounded-lg"> <img src="/talent-coin.png" alt="Talent coin" className="w-8 h-8 mr-2" /> <p className="font-bold text-2xl">Total Talents: {talentsLog.find(t => t.id === adminSelectedStudent)?.totalTalents || 0}</p> </div>
               <ul>{adminStudentLog.map((log) => ( <li key={log.id} className="p-2 border-b border-slate-700 text-xl"> <div className="flex justify-between items-start"> <span className="flex-1 mr-2"><span className="font-bold">{log.date}</span> [{log.type}]: {log.text}</span> <div className="flex items-center space-x-2 flex-shrink-0"> {log.adminLiked ? <span className="text-green-500 font-bold text-lg">✓ Liked</span> : <button onClick={() => handleAdminLike(log.id, log.name)} className="text-3xl">👍</button>} <button onClick={() => modifyTalent(log.name, -1, 'penalty')} className="px-3 py-1 bg-red-600 text-white text-md font-bold rounded hover:bg-red-700">-1</button> </div> </div> {log.reply && <div className="mt-2 p-2 bg-green-900 rounded-lg text-lg"><span className="font-bold">✓ You Replied</span></div>} <ReplyForm log={log} onReply={handleReply} /> </li> ))}</ul>
             </div>
@@ -188,12 +199,12 @@ const App = () => {
             <>
               <div className="flex justify-center items-center space-x-2 mb-6"> <label className="text-2xl text-gray-300">View Logs for Date:</label> <input type="date" value={adminSelectedDate} onChange={(e) => setAdminSelectedDate(e.target.value)} className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-2xl"/> </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="text-left p-4 border border-slate-600 rounded-xl"> <h3 className="text-3xl font-semibold mb-2">Daily Requirement Progress</h3> <ul className="space-y-1 text-lg h-40 overflow-y-auto">{Object.entries(adminDailyProgress).map(([name, progress]) => { const qcMet = progress.question_comment >= 2; const rMet = progress.reasoning >= 2; return ( <li key={name} className="flex justify-between items-center pr-2"> <span>{getFirstName(name)}:</span> <span> <span className={qcMet ? 'text-green-400' : 'text-red-400'}>{qcMet ? '✅' : '❌'} {progress.question_comment}/2</span> / <span className={rMet ? 'text-green-400' : 'text-red-400'}>{rMet ? '✅' : '❌'} {progress.reasoning}/2</span> </span> </li> ); })}</ul> </div>
-                <div className="text-left p-4 border border-slate-600 rounded-xl"> <h3 className="text-3xl font-semibold">🚦 Daily Understanding Check</h3> <ul className="h-40 overflow-y-auto text-lg">{feedbackLog.map((log) => ( <li key={log.id} className="p-2 border-b border-slate-700">({log.timestamp?.toDate().toLocaleTimeString()}) {getFirstName(log.name)}: {log.status}</li> ))}</ul> </div>
+                <div className="text-left p-4 border border-slate-600 rounded-xl"> <h3 className="text-3xl font-semibold mb-2">Daily Requirement Progress</h3> <ul className="space-y-1 text-lg h-40 overflow-y-auto">{Object.entries(adminDailyProgress).map(([name, progress]) => { const qcMet = progress.question_comment >= 2; const rMet = progress.reasoning >= 2; return ( <li key={name} className="flex justify-between items-center pr-2"> <span>{isAdminAnonymousMode ? "Anonymous" : getFirstName(name)}:</span> <span> <span className={qcMet ? 'text-green-400' : 'text-red-400'}>{qcMet ? '✅' : '❌'} {progress.question_comment}/2</span> / <span className={rMet ? 'text-green-400' : 'text-red-400'}>{rMet ? '✅' : '❌'} {progress.reasoning}/2</span> </span> </li> ); })}</ul> </div>
+                <div className="text-left p-4 border border-slate-600 rounded-xl"> <h3 className="text-3xl font-semibold">🚦 Daily Understanding Check</h3> <ul className="h-40 overflow-y-auto text-lg">{feedbackLog.map((log) => ( <li key={log.id} className="p-2 border-b border-slate-700">({log.timestamp?.toDate().toLocaleTimeString()}) {isAdminAnonymousMode ? "Anonymous" : getFirstName(log.name)}: {log.status}</li> ))}</ul> </div>
               </div>
               <div className="text-left p-4 border border-slate-600 rounded-xl mt-6"> 
                 <h3 className="text-3xl font-semibold">❓ All Daily Posts</h3>
-                <ul className="h-[600px] overflow-y-auto text-xl">{questionsLog.map((log) => ( <li key={log.id} className="p-2 border-b border-slate-700"> <div className="flex justify-between items-start"> <span className="flex-1 mr-2">{getFirstName(log.name)} [{log.type}]: {log.text}</span> <div className="flex items-center space-x-2 flex-shrink-0"> {log.adminLiked ? <span className="text-green-500 font-bold text-lg">✓ Liked</span> : <button onClick={() => handleAdminLike(log.id, log.name)} className="text-3xl">👍</button>} <button onClick={() => modifyTalent(log.name, -1, 'penalty')} className="px-3 py-1 bg-red-600 text-white text-md font-bold rounded hover:bg-red-700">-1</button> </div> </div> {log.reply && <div className="mt-2 p-2 bg-green-900 rounded-lg text-lg"><span className="font-bold">✓ You Replied</span></div>} <ReplyForm log={log} onReply={handleReply} /> <button onClick={() => toggleReplies(log.id)} className="text-lg text-blue-400 mt-1">{showReplies[log.id] ? 'Hide Replies' : 'Show Replies'}</button> {showReplies[log.id] && <div className="mt-2 pl-4 border-l-2 border-slate-500"> <ul className="text-lg mt-2">{replies[log.id]?.map(reply => <li key={reply.id} className="pt-1 flex justify-between items-center"><span>{reply.author}: {reply.text}</span></li>)}</ul></div>} </li> ))}</ul>
+                <ul className="h-[600px] overflow-y-auto text-xl">{questionsLog.map((log) => ( <li key={log.id} className="p-2 border-b border-slate-700"> <div className="flex justify-between items-start"> <span className="flex-1 mr-2">{isAdminAnonymousMode ? "Anonymous" : getFirstName(log.name)} [{log.type}]: {log.text}</span> <div className="flex items-center space-x-2 flex-shrink-0"> {log.adminLiked ? <span className="text-green-500 font-bold text-lg">✓ Liked</span> : <button onClick={() => handleAdminLike(log.id, log.name)} className="text-3xl">👍</button>} <button onClick={() => modifyTalent(log.name, -1, 'penalty')} className="px-3 py-1 bg-red-600 text-white text-md font-bold rounded hover:bg-red-700">-1</button> </div> </div> {log.reply && <div className="mt-2 p-2 bg-green-900 rounded-lg text-lg"><span className="font-bold">✓ You Replied</span></div>} <ReplyForm log={log} onReply={handleReply} /> <button onClick={() => toggleReplies(log.id)} className="text-lg text-blue-400 mt-1">{showReplies[log.id] ? 'Hide Replies' : 'Show Replies'}</button> {showReplies[log.id] && <div className="mt-2 pl-4 border-l-2 border-slate-500"> <ul className="text-lg mt-2">{replies[log.id]?.map(reply => <li key={reply.id} className="pt-1 flex justify-between items-center"><span>{isAdminAnonymousMode ? "Anonymous" : reply.author}: {reply.text}</span></li>)}</ul></div>} </li> ))}</ul>
               </div>
             </>
           )}
@@ -215,17 +226,26 @@ const App = () => {
                   <li>Question/Comment (x2): <span className="font-semibold">1 Talent each</span></li>
                   <li>Reasoning (x2): <span className="font-semibold">1 Talent each</span></li>
                   <li>Reply to a Peer's Post: <span className="font-semibold">+1 Talent</span></li>
+                  <li>Spoke in class (Max 2): <span className="font-semibold">+1 Talent</span></li>
                   <li><span className="font-semibold text-yellow-400">Bonus:</span> Get a 'Like' from Prof. Ahn on your original post: <span className="font-semibold">+1 Talent</span></li>
                 </ul>
               </div>
               <div className="flex justify-center items-center space-x-2 my-4"> <label className="text-2xl text-gray-300">View Logs for Date:</label> <input type="date" value={studentSelectedDate} onChange={(e) => setStudentSelectedDate(e.target.value)} className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-2xl"/> </div>
               {!isClassActive && <div className="text-center p-3 bg-red-800 text-white rounded-lg mb-4 text-xl"><p>You can only submit new responses during class time.</p></div>}
-              <div className={`p-4 border border-slate-600 rounded-xl mb-6 ${!isReadyToParticipate ? 'opacity-50 pointer-events-none' : ''}`}>
-                <p className="text-3xl font-medium text-center text-gray-200">Understanding Check</p>
-                <div className="flex justify-center space-x-4 mt-2">
-                  <button onClick={() => handleFeedback('Not Understood 🙁')} className={`p-4 w-20 h-20 rounded-full bg-red-500 flex justify-center items-center text-4xl ${clickedButton === 'Not Understood 🙁' ? 'ring-4 ring-orange-500' : ''}`}>🙁</button>
-                  <button onClick={() => handleFeedback('Confused 🤔')} className={`p-4 w-20 h-20 rounded-full bg-yellow-400 flex justify-center items-center text-4xl ${clickedButton === 'Confused 🤔' ? 'ring-4 ring-orange-500' : ''}`}>🤔</button>
-                  <button onClick={() => handleFeedback('Got It! ✅')} className={`p-4 w-20 h-20 rounded-full bg-green-500 flex justify-center items-center text-4xl ${clickedButton === 'Got It! ✅' ? 'ring-4 ring-orange-500' : ''}`}>✅</button>
+              <div className={`p-4 border border-slate-600 rounded-xl mb-6 grid grid-cols-2 gap-4`}>
+                <div>
+                  <p className="text-3xl font-medium text-center text-gray-200">Understanding Check</p>
+                  <div className="flex justify-center space-x-4 mt-2">
+                    <button onClick={() => handleFeedback('Not Understood 🙁')} className={`p-4 w-20 h-20 rounded-full bg-red-500 flex justify-center items-center text-4xl ${clickedButton === 'Not Understood 🙁' ? 'ring-4 ring-orange-500' : ''}`}>🙁</button>
+                    <button onClick={() => handleFeedback('Confused 🤔')} className={`p-4 w-20 h-20 rounded-full bg-yellow-400 flex justify-center items-center text-4xl ${clickedButton === 'Confused 🤔' ? 'ring-4 ring-orange-500' : ''}`}>🤔</button>
+                    <button onClick={() => handleFeedback('Got It! ✅')} className={`p-4 w-20 h-20 rounded-full bg-green-500 flex justify-center items-center text-4xl ${clickedButton === 'Got It! ✅' ? 'ring-4 ring-orange-500' : ''}`}>✅</button>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-3xl font-medium text-center text-gray-200">Verbal Participation</p>
+                  <div className="flex justify-center mt-2">
+                    <button onClick={handleVerbalParticipation} disabled={verbalParticipationCount >= 2} className="p-4 w-44 h-20 rounded-lg bg-sky-500 flex justify-center items-center text-4xl disabled:opacity-50">✋</button>
+                  </div>
                 </div>
               </div>
               <div className="text-center p-3 bg-slate-700 text-white rounded-lg mb-4"> <p className="font-bold text-2xl">Daily Requirement: 4 Talents (2 Q/C + 2 Reasoning)</p> <p className="text-xl">Today's Progress: <span className={`mx-1 ${dailyProgress.question_comment >= 2 ? 'text-green-400' : 'text-red-400'}`}>[{dailyProgress.question_comment}/2 Q/C]</span> <span className={`mx-1 ${dailyProgress.reasoning >= 2 ? 'text-green-400' : 'text-red-400'}`}>[{dailyProgress.reasoning}/2 Reasoning]</span></p> </div>
@@ -238,9 +258,8 @@ const App = () => {
               <div className="text-left p-4 border border-slate-600 rounded-xl mt-2"> <h3 className="text-3xl font-semibold text-gray-100 mb-2">My Talent History</h3> <ul className="text-lg space-y-1">{talentTransactions.map((log, i) => ( <li key={i} className={`p-1 flex justify-between items-center ${log.points > 0 ? 'text-green-400' : 'text-red-400'}`}> <span><span className="font-bold">{log.points > 0 ? `+${log.points}` : log.points}</span>: {log.type}</span> <span className="text-base text-gray-500">({log.timestamp?.toDate().toLocaleDateString()})</span> </li> ))}</ul> </div>
               {studentSelectedDate && <div className="text-left p-4 border border-slate-600 rounded-xl mt-6"> 
                 <h3 className="text-3xl font-semibold">Logs for {studentSelectedDate}</h3> 
-                <h4 className="font-semibold mt-4 text-2xl text-gray-300">✍️ My Posts</h4> <ul className="text-lg">{studentActivityLog.map((log) => <li key={log.id} className="p-2 border-b border-slate-700"><div>{log.adminLiked && <span className="mr-2 text-yellow-400 font-bold">👍 by Prof. Ahn (+1 Bonus)</span>}[{log.type}]: {log.text}</div> {log.reply && <div className="mt-2 p-2 bg-slate-600 rounded-lg text-lg text-gray-200 flex justify-between items-center"><span><b>Prof. Ahn's Reply:</b> {log.reply}</span> <button onClick={() => !log.studentLiked && handleStudentLike(log.id)} disabled={log.studentLiked} className="ml-2 text-3xl disabled:opacity-50">{log.studentLiked ? '👍 Liked' : '👍'}</button> </div>} <button onClick={() => toggleReplies(log.id)} className="text-lg text-blue-400 mt-1">{showReplies[log.id] ? 'Hide Replies' : 'Show Replies'}</button> {showReplies[log.id] && <div className="mt-2 pl-4 border-l-2 border-slate-500"><StudentReplyForm postId={log.id} onAddReply={handleAddReply} /> <ul className="text-lg mt-2">{replies[log.id]?.map(reply => <li key={reply.id} className="pt-1 flex justify-between items-center"><span>{reply.author}: {reply.text}</span></li>)}</ul></div>} </li>)}</ul>
-                <h4 className="font-semibold mt-4 text-2xl text-gray-300">All Peers' Posts & Replies</h4>
-                <ul className="h-[600px] overflow-y-auto text-lg">{allPostsLog.map((log) => <li key={log.id} className="p-2 border-b border-slate-700"><div>{log.adminLiked && <span className="mr-2 font-bold text-yellow-400">👍 by Prof. Ahn (+1 Bonus)</span>}[{log.type}]: {log.text}</div> {log.reply && <div className="mt-2 p-2 bg-slate-600 rounded-lg text-lg text-gray-200"><b>Prof. Ahn's Reply:</b> {log.reply}</div>} <button onClick={() => toggleReplies(log.id)} className="text-lg text-blue-400 mt-1">{showReplies[log.id] ? 'Hide Replies' : 'Show Replies'}</button> {showReplies[log.id] && <div className="mt-2 pl-4 border-l-2 border-slate-500"><StudentReplyForm postId={log.id} onAddReply={handleAddReply} /> <ul className="text-lg mt-2">{replies[log.id]?.map(reply => <li key={reply.id} className="pt-1 flex justify-between items-center"><span>{reply.author}: {reply.text}</span></li>)}</ul></div>} </li>)}</ul>
+                <h4 className="font-semibold mt-4 text-2xl text-gray-300">All Anonymous Posts & Replies</h4>
+                <ul className="h-[600px] overflow-y-auto text-lg">{allPostsLog.map((log) => <li key={log.id} className="p-2 border-b border-slate-700"><div>{log.name === nameInput && log.adminLiked && <span className="mr-2 text-yellow-400 font-bold">👍 by Prof. Ahn (+1 Bonus)</span>}[{log.type}]: {log.text}</div> {log.name === nameInput && log.reply && <div className="mt-2 p-2 bg-slate-600 rounded-lg text-lg text-gray-200 flex justify-between items-center"><span><b>Prof. Ahn's Reply:</b> {log.reply}</span> <button onClick={() => !log.studentLiked && handleStudentLike(log.id)} disabled={log.studentLiked} className="ml-2 text-3xl disabled:opacity-50">{log.studentLiked ? '👍 Liked' : '👍'}</button> </div>} <button onClick={() => toggleReplies(log.id)} className="text-lg text-blue-400 mt-1">{showReplies[log.id] ? 'Hide Replies' : 'Show Replies'}</button> {showReplies[log.id] && <div className="mt-2 pl-4 border-l-2 border-slate-500"><StudentReplyForm postId={log.id} onAddReply={handleAddReply} /> <ul className="text-lg mt-2">{replies[log.id]?.map(reply => <li key={reply.id} className="pt-1 flex justify-between items-center"><span>Anonymous: {reply.text}</span></li>)}</ul></div>} </li>)}</ul>
                 <h4 className="font-semibold mt-4 text-2xl text-gray-300">🚦 My Understanding Checks</h4> <ul className="text-lg">{studentFeedbackLog.map((log, i) => <li key={i} className="p-2 border-b border-slate-700 text-gray-300">({log.timestamp?.toDate().toLocaleTimeString()}): {log.status}</li>)}</ul>
               </div> }
               <div className="text-left p-4 border border-slate-600 rounded-xl mt-6"> <h3 className="text-3xl font-semibold text-gray-100 mb-4">Class Score Range</h3> <TalentGraph talentsData={talentsLog} type="student" selectedCourse={selectedCourse} getFirstName={getFirstName} /> </div>
