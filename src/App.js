@@ -60,8 +60,8 @@ function usePreserveScroll(ref, deps) {
     if (!el) return;
     const prevBottom = el.scrollHeight - el.scrollTop;
     requestAnimationFrame(() => {
-      if (!el) return;
-      el.scrollTop = el.scrollHeight - prevBottom;
+      if (!ref.current) return;
+      ref.current.scrollTop = ref.current.scrollHeight - prevBottom;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
@@ -95,7 +95,6 @@ const TalentGraph = ({ talentsData, type, selectedCourse, getFirstName }) => {
             <span>{t.totalTalents}</span>
           </div>
           <div className="w-full bg-slate-600 rounded-full h-5">
-            {/* 🔧 FIXED: removed stray backtick here */}
             <div
               className="bg-yellow-400 h-5 rounded-full"
               style={{ width: maxScore>0 ? `${(t.totalTalents/maxScore)*100}%` : '0%' }}
@@ -217,11 +216,11 @@ const App = () => {
   const [myTotalTalents, setMyTotalTalents] = useState(0);
   const [talentTransactions, setTalentTransactions] = useState([]);
 
-  const [questionsLog, setQuestionsLog] = useState([]);   // admin
+  const [questionsLog, setQuestionsLog] = useState([]);   // admin merged
   const [feedbackLog, setFeedbackLog] = useState([]);
   const [adminStudentLog, setAdminStudentLog] = useState([]);
 
-  const [allPostsLog, setAllPostsLog] = useState([]);     // student
+  const [allPostsLog, setAllPostsLog] = useState([]);     // student merged
 
   const [activePoll, setActivePoll] = useState(null);
   const [userPollVote, setUserPollVote] = useState(null);
@@ -302,14 +301,13 @@ const App = () => {
     return () => clearInterval(interval);
   }, [selectedCourse]);
 
-  /* ======= Helper: subscribe multiple appIds and merge ======= */
-  function subscribeMergedQuestions({ course, date, byStudentName, setState }) {
+  /* ======= subscribe helpers: useCallback로 메모이즈 ======= */
+  const subscribeMergedQuestions = useCallback(({ course, date, byStudentName, setState }) => {
     if (!db) return () => {};
     const appIds = [resolvedAppId, ...ADDITIONAL_READ_IDS];
     const unsubs = [];
-    const key = (docRef) => docRef.path; // unique
-
-    setState([]); // reset before fill
+    const key = (docRef) => docRef.path;
+    setState([]); // reset
     const map = new Map();
 
     appIds.forEach((appId) => {
@@ -334,9 +332,9 @@ const App = () => {
       unsubs.push(unsub);
     });
     return () => unsubs.forEach(u=>u());
-  }
+  }, [db, resolvedAppId]);
 
-  function subscribeMergedFeedback({ course, date, byStudentName, setState }) {
+  const subscribeMergedFeedback = useCallback(({ course, date, byStudentName, setState }) => {
     if (!db) return () => {};
     const appIds = [resolvedAppId, ...ADDITIONAL_READ_IDS];
     const unsubs = [];
@@ -366,7 +364,7 @@ const App = () => {
       unsubs.push(unsub);
     });
     return () => unsubs.forEach(u=>u());
-  }
+  }, [db, resolvedAppId]);
 
   /* Talents (현재 appId) */
   useEffect(() => {
@@ -398,7 +396,7 @@ const App = () => {
       setState: setFeedbackLog
     });
     return () => { offQ(); offF(); };
-  }, [db, isAdmin, selectedCourse, adminSelectedDate, resolvedAppId]);
+  }, [db, isAdmin, selectedCourse, adminSelectedDate, subscribeMergedQuestions, subscribeMergedFeedback]);
 
   /* Admin: 특정 학생 로그 */
   useEffect(() => {
@@ -409,7 +407,7 @@ const App = () => {
       setState: setAdminStudentLog
     });
     return () => off();
-  }, [db, isAdmin, selectedCourse, adminSelectedStudent, resolvedAppId]);
+  }, [db, isAdmin, selectedCourse, adminSelectedStudent, subscribeMergedQuestions]);
 
   /* Student view (본인 포함, 해당 날짜 전체) */
   const studentListRefQC = useRef(null);
@@ -455,7 +453,7 @@ const App = () => {
     });
 
     return () => { unsubM(); unsubT(); offAll(); };
-  }, [db, selectedCourse, nameInput, studentSelectedDate, resolvedAppId, isAdmin, isAuthenticated]);
+  }, [db, selectedCourse, nameInput, studentSelectedDate, resolvedAppId, isAdmin, isAuthenticated, subscribeMergedQuestions]);
 
   /* Polls (현재 app만) */
   useEffect(() => {
@@ -516,7 +514,6 @@ const App = () => {
 
   const handleReply = useCallback(async (logId, replyText) => {
     if (!db) return;
-    // 현재 app 먼저, 실패하면 추가 appId들 시도
     const appIds = [resolvedAppId, ...ADDITIONAL_READ_IDS];
     for (const appId of appIds) {
       try {
@@ -1003,7 +1000,7 @@ const App = () => {
                     <div className="flex flex-col space-y-6 mt-6">
                       <div className="text-left">
                         <h4 className="font-semibold mt-4 text-2xl text-gray-300">❓ Questions & Comments</h4>
-                        <ul ref={studentListRefQC} className="h-[600px] overflow-y-auto text-lg">
+                        <ul className="h-[600px] overflow-y-auto text-lg" ref={studentListRefQC}>
                           {studentQcPosts.map((log) => (
                             <li key={log._path || log.id} className="p-2 border-b border-slate-700">
                               <div>
@@ -1019,7 +1016,9 @@ const App = () => {
                               <button onClick={() => toggleReplies(log.id)} className="text-lg text-blue-400 mt-1">{showReplies[log.id] ? 'Hide Replies' : 'Show Replies'}</button>
                               {showReplies[log.id] && (
                                 <div className="mt-2 pl-4 border-l-2 border-slate-500">
-                                  <StudentReplyForm postId={log.id} onAddReply={handleAddReply} />
+                                  <div className="mt-2">
+                                    <StudentReplyForm postId={log.id} onAddReply={handleAddReply} />
+                                  </div>
                                   <ul className="text-lg mt-2">{replies[log.id]?.map(reply => <li key={reply.id} className="pt-1 flex justify-between items-center"><span>Anonymous: {reply.text}</span></li>)}</ul>
                                 </div>
                               )}
@@ -1030,7 +1029,7 @@ const App = () => {
 
                       <div className="text-left">
                         <h4 className="font-semibold mt-4 text-2xl text-gray-300">🤔 Reasoning Posts</h4>
-                        <ul ref={studentListRefReason} className="h-[600px] overflow-y-auto text-lg">
+                        <ul className="h-[600px] overflow-y-auto text-lg" ref={studentListRefReason}>
                           {studentReasoningPosts.map((log) => (
                             <li key={log._path || log.id} className="p-2 border-b border-slate-700">
                               <div>
@@ -1046,7 +1045,9 @@ const App = () => {
                               <button onClick={() => toggleReplies(log.id)} className="text-lg text-blue-400 mt-1">{showReplies[log.id] ? 'Hide Replies' : 'Show Replies'}</button>
                               {showReplies[log.id] && (
                                 <div className="mt-2 pl-4 border-l-2 border-slate-500">
-                                  <StudentReplyForm postId={log.id} onAddReply={handleAddReply} />
+                                  <div className="mt-2">
+                                    <StudentReplyForm postId={log.id} onAddReply={handleAddReply} />
+                                  </div>
                                   <ul className="text-lg mt-2">{replies[log.id]?.map(reply => <li key={reply.id} className="pt-1 flex justify-between items-center"><span>Anonymous: {reply.text}</span></li>)}</ul>
                                 </div>
                               )}
