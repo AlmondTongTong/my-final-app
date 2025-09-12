@@ -18,37 +18,25 @@ const COURSE_STUDENTS = {
 };
 
 /* =========================
-   유틸: 시간/날짜 안전 포맷
+   유틸
    ========================= */
-const safeTime = (ts) => {
-  try { if (!ts || !ts.toDate) return ''; return ts.toDate().toLocaleTimeString(); } catch { return ''; }
-};
-const safeDate = (ts) => {
-  try { if (!ts || !ts.toDate) return ''; return ts.toDate().toLocaleDateString(); } catch { return ''; }
-};
+const safeTime = (ts) => { try { return ts?.toDate?.().toLocaleTimeString() || ''; } catch { return ''; } };
+const safeDate = (ts) => { try { return ts?.toDate?.().toLocaleDateString() || ''; } catch { return ''; } };
 
 const isWithinClassTime = (courseName) => {
   const now = new Date();
-  const losAngelesTime = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
-  const day = losAngelesTime.getDay(), hour = losAngelesTime.getHours(), minute = losAngelesTime.getMinutes();
-  const currentTimeInMinutes = hour * 60 + minute;
+  const la = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+  const day = la.getDay(), hour = la.getHours(), minute = la.getMinutes();
+  const m = hour * 60 + minute;
   switch(courseName) {
-    case "ADV 375-01":
-      if (day === 1 || day === 4) { const s=8*60,e=9*60+50; return currentTimeInMinutes>=s&&currentTimeInMinutes<=e; }
-      return false;
-    case "ADV 375-02":
-      if (day === 1 || day === 4) { const s=12*60,e=13*60+50; return currentTimeInMinutes>=s&&currentTimeInMinutes<=e; }
-      return false;
-    case "ADV 461":
-      if (day === 3) { const s=12*60,e=15*60+50; return currentTimeInMinutes>=s&&currentTimeInMinutes<=e; }
-      return false;
+    case "ADV 375-01": if (day===1 || day===4) { const s=8*60,e=9*60+50; return m>=s && m<=e; } return false;
+    case "ADV 375-02": if (day===1 || day===4) { const s=12*60,e=13*60+50; return m>=s && m<=e; } return false;
+    case "ADV 461": if (day===3) { const s=12*60,e=15*60+50; return m>=s && m<=e; } return false;
     default: return false;
   }
 };
 
-/* =========================
-   공통 훅: 스크롤 보존
-   ========================= */
+/* 스크롤 보존 훅: 리스트 업데이트 때 현재 하단 기준 유지 */
 function usePreserveScroll(ref, deps) {
   useEffect(() => {
     const el = ref.current;
@@ -73,14 +61,15 @@ const TalentGraph = ({ talentsData, type, selectedCourse, getFirstName }) => {
     const sorted = allStudents.sort((a, b) => b.totalTalents - a.totalTalents);
     if (type === 'admin') return sorted;
     if (type === 'student' && sorted.length > 0) {
-      const highest = sorted[0], lowest = sorted[sorted.length - 1];
+      const highest = sorted[0], lowest = sorted[sorted.length-1];
       return highest.id === lowest.id ? [highest] : [highest, lowest];
     }
     return [];
   }, [talentsData, selectedCourse, type]);
 
   if (displayData.length === 0) return <p className="text-gray-400 text-lg">No talent data yet.</p>;
-  const maxScore = displayData[0].totalTalents;
+  const maxScore = displayData[0].totalTalents || 0;
+
   return (
     <div className="space-y-4">
       {displayData.map(t => (
@@ -90,10 +79,7 @@ const TalentGraph = ({ talentsData, type, selectedCourse, getFirstName }) => {
             <span>{t.totalTalents}</span>
           </div>
           <div className="w-full bg-slate-600 rounded-full h-5">
-            <div
-              className="bg-yellow-400 h-5 rounded-full"
-              style={{ width: maxScore > 0 ? `${(t.totalTalents / maxScore) * 100}%` : '0%' }}
-            />
+            <div className="bg-yellow-400 h-5 rounded-full" style={{ width: maxScore>0 ? `${(t.totalTalents/maxScore)*100}%` : '0%' }} />
           </div>
         </div>
       ))}
@@ -102,7 +88,7 @@ const TalentGraph = ({ talentsData, type, selectedCourse, getFirstName }) => {
 };
 
 /* =========================
-   폼(입력 보존: localStorage)
+   ContentForm: draft 자동저장
    ========================= */
 const ContentForm = React.memo(({ formKey, type, onAddContent, isEnabled, placeholder }) => {
   const STORAGE_KEY = 'draft:' + formKey + ':' + type;
@@ -134,6 +120,9 @@ const ContentForm = React.memo(({ formKey, type, onAddContent, isEnabled, placeh
   );
 });
 
+/* =========================
+   Admin 로그인
+   ========================= */
 const AdminLoginForm = ({ onAdminLogin }) => {
   const [password, setPassword] = useState('');
   return (
@@ -145,18 +134,20 @@ const AdminLoginForm = ({ onAdminLogin }) => {
   );
 };
 
+/* =========================
+   PIN 인증
+   ========================= */
 const PinAuth = React.memo(({ nameInput, isPinRegistered, onLogin, onRegister, getFirstName }) => {
-  const [pinInput,setPinInput]=useState('');const [pinConfirmationInput,setPinConfirmationInput]=useState('');
-  const handleLoginClick=()=>{ onLogin(pinInput); setPinInput(''); };
-  const handleRegisterClick=()=>{ onRegister(pinInput,pinConfirmationInput); setPinInput(''); setPinConfirmationInput(''); };
+  const [pinInput,setPinInput]=useState(''); const [pinConfirm,setPinConfirm]=useState('');
   if(!nameInput) return null;
+
   return isPinRegistered ? (
     <div className="my-4 p-4 bg-slate-700 rounded-lg animate-fade-in">
       <p className="text-center text-white mb-2 font-semibold text-2xl">Enter your 4-digit PIN, {getFirstName(nameInput)}.</p>
       <div className="flex space-x-2">
         <input type="password" inputMode="numeric" maxLength="4" value={pinInput} onChange={(e)=>setPinInput(e.target.value)}
           className="flex-1 p-3 border bg-slate-600 border-slate-500 rounded-lg text-2xl text-center"/>
-        <button onClick={handleLoginClick} className="p-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-xl">Login</button>
+        <button onClick={()=>{ onLogin(pinInput); setPinInput(''); }} className="p-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-xl">Login</button>
       </div>
     </div>
   ) : (
@@ -167,44 +158,58 @@ const PinAuth = React.memo(({ nameInput, isPinRegistered, onLogin, onRegister, g
       <div className="space-y-2">
         <input type="password" inputMode="numeric" maxLength="4" value={pinInput} onChange={(e)=>setPinInput(e.target.value)}
           placeholder="Create 4-digit PIN" className="w-full p-3 border bg-slate-600 border-slate-500 rounded-lg text-2xl text-center"/>
-        <input type="password" inputMode="numeric" maxLength="4" value={pinConfirmationInput} onChange={(e)=>setPinConfirmationInput(e.target.value)}
+        <input type="password" inputMode="numeric" maxLength="4" value={pinConfirm} onChange={(e)=>setPinConfirm(e.target.value)}
           placeholder="Confirm PIN" className="w-full p-3 border bg-slate-600 border-slate-500 rounded-lg text-2xl text-center"/>
-        <button onClick={handleRegisterClick} className="w-full p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-bold text-xl">Register & Start</button>
+        <button onClick={()=>{ onRegister(pinInput, pinConfirm); setPinInput(''); setPinConfirm(''); }}
+          className="w-full p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-bold text-xl">Register & Start</button>
       </div>
     </div>
   );
 });
 
 /* =========================
-   메인 앱
+   메인 App
    ========================= */
 const App = () => {
   const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+  const ADMIN_PASSWORD = '0811'; // ESLint: 사용하도록 보장
   const [db, setDb] = useState(null);
+
   const [nameInput, setNameInput] = useState('');
   const [selectedCourse, setSelectedCourse] = useState(COURSES[0]);
   const [isAdmin, setIsAdmin] = useState(false);
-  const ADMIN_PASSWORD = '0811';
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isPinRegistered, setIsPinRegistered] = useState(false);
+
   const [message, setMessage] = useState('');
   const [showMessageBox, setShowMessageBox] = useState(false);
+
   const [isClassActive, setIsClassActive] = useState(false);
   const [talentsLog, setTalentsLog] = useState([]);
+
   const [studentSelectedDate, setStudentSelectedDate] = useState(()=>new Date().toISOString().slice(0,10));
-  const [myTotalTalents, setMyTotalTalents] = useState(0);
-  const [talentTransactions, setTalentTransactions] = useState([]);
   const [adminSelectedDate, setAdminSelectedDate] = useState(()=>new Date().toISOString().slice(0,10));
   const [adminSelectedStudent, setAdminSelectedStudent] = useState('');
-  const [adminStudentLog, setAdminStudentLog] = useState([]);
-  const [questionsLog, setQuestionsLog] = useState([]);       // admin view master
+
+  const [myTotalTalents, setMyTotalTalents] = useState(0);
+  const [talentTransactions, setTalentTransactions] = useState([]);
+
+  const [questionsLog, setQuestionsLog] = useState([]);    // admin view master
   const [feedbackLog, setFeedbackLog] = useState([]);
-  const [allPostsLog, setAllPostsLog] = useState([]);         // student view day posts
+
+  const [allPostsLog, setAllPostsLog] = useState([]);      // student view day posts
+
   const [activePoll, setActivePoll] = useState(null);
   const [userPollVote, setUserPollVote] = useState(null);
+
   const [replies, setReplies] = useState({});
   const [showReplies, setShowReplies] = useState({});
   const [isAdminAnonymousMode, setIsAdminAnonymousMode] = useState(false);
+
+  // 복원된 참여 관련 상태
+  const [dailyProgress, setDailyProgress] = useState({ question_comment: 0, reasoning: 0 });
+  const [clickedButton, setClickedButton] = useState(null);
+  const [verbalParticipationCount, setVerbalParticipationCount] = useState(0);
 
   const showMessage = useCallback((msg) => {
     setMessage(msg); setShowMessageBox(true);
@@ -282,7 +287,7 @@ const App = () => {
     return () => unsub();
   }, [db, selectedCourse, appId]);
 
-  /* Admin: 질문/피드백 (증분 반영 & createdAtClient 정렬) */
+  /* Admin: 질문/피드백 (증분 반영 + 클라정렬) */
   const adminListRefQC = useRef(null);
   const adminListRefReason = useRef(null);
   usePreserveScroll(adminListRefQC, [questionsLog.length]);
@@ -320,6 +325,7 @@ const App = () => {
   }, [db, selectedCourse, adminSelectedDate, appId, isAdmin]);
 
   /* Admin: 특정 학생 로그 */
+  const [adminStudentLog, setAdminStudentLog] = useState([]);
   useEffect(() => {
     if (!db || !isAdmin || !adminSelectedStudent) { setAdminStudentLog([]); return; }
     const logQuery = query(
@@ -341,6 +347,7 @@ const App = () => {
   useEffect(() => {
     if (!db || isAdmin || !nameInput || !isAuthenticated) {
       setAllPostsLog([]); setMyTotalTalents(0); setTalentTransactions([]);
+      setDailyProgress({ question_comment: 0, reasoning: 0 });
       return;
     }
     const transactionsQuery = query(
@@ -352,6 +359,7 @@ const App = () => {
       const today = new Date().toISOString().slice(0,10);
       const todays = snap.docs.map(d=>d.data()).filter(t => t.timestamp?.toDate().toISOString().slice(0,10)===today);
       setTalentTransactions(todays);
+      setVerbalParticipationCount(todays.filter(t => t.type === 'verbal_participation').length);
     });
 
     const talentDocRef = doc(db, `/artifacts/${appId}/public/data/talents`, nameInput);
@@ -367,9 +375,23 @@ const App = () => {
     const unsubAll = onSnapshot(allPostsQuery, snapshot => {
       const posts = snapshot.docs.map(d=>({id:d.id,...d.data()}));
       setAllPostsLog(posts);
+      const myPosts = posts.filter(p => p.name === nameInput);
+      setDailyProgress({
+        question_comment: myPosts.filter(a => a.type === 'question_comment').length,
+        reasoning: myPosts.filter(a => a.type === 'reasoning').length
+      });
     });
 
-    return () => { unsubM(); unsubT(); unsubAll(); };
+    const feedbackQuery = query(
+      collection(db, `/artifacts/${appId}/public/data/feedback`),
+      where("course","==",selectedCourse),
+      where("name","==",nameInput),
+      where("date","==",studentSelectedDate),
+      orderBy("createdAtClient","asc")
+    );
+    const unsubF = onSnapshot(feedbackQuery, (snap) => { /* 필요시 학생 개별 피드백 로그 표시용으로 활용 */ });
+
+    return () => { unsubM(); unsubT(); unsubAll(); unsubF(); };
   }, [db, selectedCourse, nameInput, studentSelectedDate, appId, isAdmin, isAuthenticated]);
 
   /* Poll */
@@ -421,7 +443,7 @@ const App = () => {
   }, [db, nameInput, selectedCourse, appId, modifyTalent, showMessage]);
 
   const handleAdminLogin = (password) => {
-    if (password === '0811') { setIsAdmin(true); showMessage("Admin Login successful! 🔑"); }
+    if (password === ADMIN_PASSWORD) { setIsAdmin(true); showMessage("Admin Login successful! 🔑"); }
     else showMessage("Incorrect password. 🚫");
   };
 
@@ -470,6 +492,7 @@ const App = () => {
 
   const handleAddReply = useCallback(async (postId, replyText) => {
     if (!db || !nameInput) return;
+    if (!replyText || !replyText.trim()) return;
     const repliesColRef = collection(db, `/artifacts/${appId}/public/data/questions/${postId}/replies`);
     try {
       await addDoc(repliesColRef, {
@@ -480,7 +503,7 @@ const App = () => {
     } catch (e) { console.error("Error adding reply: ", e); }
   }, [db, nameInput, getFirstName, appId, modifyTalent]);
 
-  /* Replies 구독: 켜고 끌 때 unsubscribe 관리 */
+  /* Replies 구독 토글 + unsubscribe 관리 */
   const replyUnsubs = useRef({});
   const toggleReplies = useCallback((postId) => {
     setShowReplies(prev => {
@@ -490,7 +513,7 @@ const App = () => {
           collection(db, `/artifacts/${appId}/public/data/questions/${postId}/replies`),
           orderBy("createdAtClient","asc")
         );
-        replyUnsubs.current[postId]?.(); // 중복 방지
+        replyUnsubs.current[postId]?.();
         replyUnsubs.current[postId] = onSnapshot(repliesQuery, (snapshot) => {
           const fetched = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
           setReplies(prevR => ({ ...prevR, [postId]: fetched }));
@@ -504,14 +527,16 @@ const App = () => {
   }, [db, appId]);
 
   useEffect(() => {
-    return () => { // 언마운트 시 모든 reply 구독 해제
+    return () => {
       Object.values(replyUnsubs.current).forEach(fn => fn && fn());
       replyUnsubs.current = {};
     };
   }, []);
 
   const isNameEntered = nameInput.trim().length > 0;
+  const isReadyToParticipate = isAuthenticated && isClassActive;
 
+  /* Admin Daily Progress 계산 */
   const adminDailyProgress = useMemo(() => {
     const roster = COURSE_STUDENTS[selectedCourse] || [];
     const init = roster.reduce((acc, n) => { acc[n] = { question_comment: 0, reasoning: 0 }; return acc; }, {});
@@ -524,7 +549,11 @@ const App = () => {
     return init;
   }, [questionsLog, selectedCourse]);
 
-  /* ============ UI 컴포넌트 (리스트 분리/메모) ============ */
+  /* 파생 리스트 (학생 뷰): useMemo 경고 회피 위해 일반 변수로 계산 */
+  const studentReasoningPosts = allPostsLog.filter(p => p.type === 'reasoning');
+  const studentQcPosts = allPostsLog.filter(p => p.type === 'question_comment');
+
+  /* ====== UI 구성 ====== */
   const ReplyForm = ({ log, onReply }) => {
     const [replyText, setReplyText] = useState(log.reply || '');
     return (
@@ -583,13 +612,75 @@ const App = () => {
     );
   });
 
+  const CreatePollForm = ({ onCreatePoll, onDeactivatePoll, activePoll }) => {
+    const [question, setQuestion] = useState(''); const [options, setOptions] = useState(['','','']);
+    const handleOptionChange=(i,v)=>{ const ns=[...options]; ns[i]=v; setOptions(ns); };
+    const addOption=()=>setOptions([...options,'']);
+    const handleSubmit=()=> {
+      const valid = options.filter(o=>o.trim()!=='');
+      if (question.trim() && valid.length>1) { onCreatePoll(question, valid); setQuestion(''); setOptions(['','','']); }
+      else alert("Please provide a question and at least two options.");
+    };
+    if (activePoll) {
+      return (
+        <div className="p-4 border border-slate-600 rounded-xl mb-6">
+          <h3 className="text-3xl font-semibold">Active Poll Results</h3>
+          <PollComponent poll={activePoll} isAdminView={true} userVote={null} />
+          <button onClick={()=>onDeactivatePoll(activePoll.id)} className="w-full p-2 mt-4 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xl">Close Poll</button>
+        </div>
+      );
+    }
+    return (
+      <div className="p-4 border border-slate-600 rounded-xl mb-6">
+        <h3 className="text-3xl font-semibold mb-2">Create New Poll</h3>
+        <input type="text" value={question} onChange={e=>setQuestion(e.target.value)} placeholder="Poll Question"
+          className="w-full p-2 mb-2 bg-slate-700 border border-slate-500 rounded-lg text-xl"/>
+        {options.map((opt,idx)=>(
+          <input key={idx} type="text" value={opt} onChange={e=>handleOptionChange(idx,e.target.value)} placeholder={`Option ${idx+1}`}
+            className="w-full p-2 mb-2 bg-slate-700 border border-slate-500 rounded-lg text-xl"/>
+        ))}
+        <button onClick={addOption} className="text-lg text-blue-400 mb-2">+ Add Option</button>
+        <button onClick={handleSubmit} className="w-full p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xl">Publish Poll</button>
+      </div>
+    );
+  };
+
+  const PollComponent = ({ poll, onVote, userVote, isAdminView=false }) => {
+    const results = useMemo(() => {
+      const responses = poll.responses ? Object.values(poll.responses) : [];
+      const totalVotes = responses.length;
+      const votesPerOption = poll.options.map((_,i)=>responses.filter(v=>v===i).length);
+      return { totalVotes, percentages: votesPerOption.map(c=> totalVotes>0 ? (c/totalVotes)*100 : 0) };
+    }, [poll]);
+    const hasVoted = userVote !== null;
+    return (
+      <div className="p-4 border border-orange-500 rounded-xl my-6 bg-slate-700">
+        <h3 className="text-3xl font-semibold text-orange-400 mb-2">{poll.question}</h3>
+        <div className="space-y-2">
+          {poll.options.map((opt, idx) => {
+            const p = results.percentages[idx] || 0;
+            if (hasVoted || isAdminView) {
+              return (
+                <div key={idx} className="p-2 bg-slate-600 rounded-lg">
+                  <div className="flex justify-between text-white mb-1 text-xl"><span>{opt}</span><span>{p.toFixed(0)}%</span></div>
+                  <div className="w-full bg-slate-500 rounded-full h-5"><div className="bg-orange-500 h-5 rounded-full" style={{ width: `${p}%` }} /></div>
+                </div>
+              );
+            }
+            return (
+              <button key={idx} onClick={()=>onVote(poll.id, idx)} className="w-full text-left p-3 bg-slate-600 hover:bg-slate-500 rounded-lg text-xl">
+                {opt}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   /* 메인 콘텐츠 */
   const MainContent = () => {
     const penalty = (studentName) => modifyTalent(studentName, -1, 'penalty');
-
-    // 파생 데이터(학생 뷰용)
-    const studentReasoningPosts = useMemo(() => allPostsLog.filter(p => p.type === 'reasoning'), [allPostsLog]);
-    const studentQcPosts = useMemo(() => allPostsLog.filter(p => p.type === 'question_comment'), [allPostsLog]);
 
     return (
       <div className="w-full max-w-4xl p-6 bg-slate-800 text-white rounded-xl shadow-lg box-shadow-custom">
@@ -721,7 +812,7 @@ const App = () => {
         ) : (
           <>
             <h1 className="text-5xl font-bold text-center mb-1"><span className="text-green-500">''Ahn''</span>stoppable Learning:<br /><span className="text-orange-500 text-3xl">Freely Ask, Freely Learn</span></h1>
-            {activePoll && <PollComponent poll={activePoll} onVote={handlePollVote} userVote={userPollVote} nameInput={nameInput} />}
+            {activePoll && <PollComponent poll={activePoll} onVote={handlePollVote} userVote={userPollVote} />}
 
             <div className="flex flex-wrap justify-center gap-2 my-6">
               {COURSES.map(course=>(
@@ -759,10 +850,37 @@ const App = () => {
                     className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-2xl"/>
                 </div>
 
-                <div className={`p-4 border border-slate-600 rounded-xl mb-6 ${!(isAuthenticated && isClassActive) ? 'opacity-50 pointer-events-none' : ''}`}>
-                  <ContentForm formKey={`${selectedCourse}:${nameInput}:${studentSelectedDate}`} type="question_comment" onAddContent={handleAddContent} isEnabled={isAuthenticated && isClassActive} placeholder="Post 2 Questions/Comments..." />
+                {/* 이해도 체크 복원 */}
+                <div className="p-4 border border-slate-600 rounded-xl mb-6 grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-3xl font-medium text-center text-gray-200">Understanding Check</p>
+                    <div className="flex justify-center space-x-4 mt-2">
+                      <button onClick={() => handleFeedback('Not Understood 🙁')} className={`p-4 w-20 h-20 rounded-full bg-red-500 flex justify-center items-center text-4xl ${clickedButton === 'Not Understood 🙁' ? 'ring-4 ring-orange-500' : ''}`}>🙁</button>
+                      <button onClick={() => handleFeedback('Confused 🤔')} className={`p-4 w-20 h-20 rounded-full bg-yellow-400 flex justify-center items-center text-4xl ${clickedButton === 'Confused 🤔' ? 'ring-4 ring-orange-500' : ''}`}>🤔</button>
+                      <button onClick={() => handleFeedback('Got It! ✅')} className={`p-4 w-20 h-20 rounded-full bg-green-500 flex justify-center items-center text-4xl ${clickedButton === 'Got It! ✅' ? 'ring-4 ring-orange-500' : ''}`}>✅</button>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-3xl font-medium text-center text-gray-200">Verbal Participation</p>
+                    <div className="flex justify-center mt-2">
+                      <button onClick={handleVerbalParticipation} disabled={verbalParticipationCount >= 2} className="p-4 w-44 h-20 rounded-lg bg-sky-500 flex justify-center items-center text-4xl disabled:opacity-50">✋</button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 작성 폼 */}
+                <div className={`p-4 border border-slate-600 rounded-xl mb-6 ${!isReadyToParticipate ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <ContentForm formKey={`${selectedCourse}:${nameInput}:${studentSelectedDate}`} type="question_comment" onAddContent={handleAddContent} isEnabled={isReadyToParticipate} placeholder="Post 2 Questions/Comments..." />
                   <div className="my-4 border-t border-slate-700" />
-                  <ContentForm formKey={`${selectedCourse}:${nameInput}:${studentSelectedDate}`} type="reasoning" onAddContent={handleAddContent} isEnabled={isAuthenticated && isClassActive} placeholder="Post 2 Reasoning posts..." />
+                  <ContentForm formKey={`${selectedCourse}:${nameInput}:${studentSelectedDate}`} type="reasoning" onAddContent={handleAddContent} isEnabled={isReadyToParticipate} placeholder="Post 2 Reasoning posts..." />
+                </div>
+
+                <div className="text-center p-3 bg-slate-700 text-white rounded-lg mb-4">
+                  <p className="font-bold text-2xl">Daily Requirement: 4 Talents (2 Q/C + 2 Reasoning)</p>
+                  <p className="text-xl">Today's Progress:
+                    <span className={`mx-1 ${dailyProgress.question_comment >= 2 ? 'text-green-400' : 'text-red-400'}`}>[{dailyProgress.question_comment}/2 Q/C]</span>
+                    <span className={`mx-1 ${dailyProgress.reasoning >= 2 ? 'text-green-400' : 'text-red-400'}`}>[{dailyProgress.reasoning}/2 Reasoning]</span>
+                  </p>
                 </div>
 
                 <div className="flex justify-center items-center text-center my-4 p-3 bg-yellow-400 text-black rounded-lg">
@@ -770,6 +888,7 @@ const App = () => {
                   <p className="font-bold text-2xl">My Total Talents: {myTotalTalents}</p>
                 </div>
 
+                {/* 학생용 리스트 */}
                 <div className="text-left p-4 border border-slate-600 rounded-xl mt-2">
                   <h3 className="text-3xl font-semibold text-gray-100 mb-2">My Talent History</h3>
                   <ul className="text-lg space-y-1">
@@ -788,38 +907,56 @@ const App = () => {
                     <div className="flex flex-col space-y-6 mt-6">
                       <div className="text-left">
                         <h4 className="font-semibold mt-4 text-2xl text-gray-300">❓ Questions & Comments</h4>
-                        <PostList
-                          posts={studentQcPosts}
-                          type="student"
-                          onAdminLike={()=>{}}
-                          onPenalty={()=>{}}
-                          onReply={()=>{}}
-                          onStudentAddReply={handleAddReply}
-                          toggleReplies={toggleReplies}
-                          showReplies={showReplies}
-                          replies={replies}
-                          listRef={studentListRefQC}
-                          anonymizeName={false}
-                          getFirstName={getFirstName}
-                        />
+                        <ul ref={studentListRefQC} className="h-[600px] overflow-y-auto text-lg">
+                          {studentQcPosts.map((log) => (
+                            <li key={log.id} className="p-2 border-b border-slate-700">
+                              <div>
+                                {log.name === nameInput && log.adminLiked && <span className="mr-2 text-yellow-400 font-bold">👍 by Prof. Ahn (+1 Bonus)</span>}
+                                [{log.type}]: {log.text}
+                              </div>
+                              {log.name === nameInput && log.reply && (
+                                <div className="mt-2 p-2 bg-slate-600 rounded-lg text-lg text-gray-200 flex justify-between items-center">
+                                  <span><b>Prof. Ahn's Reply:</b> {log.reply}</span>
+                                  <button onClick={() => !log.studentLiked && handleStudentLike(log.id)} disabled={log.studentLiked} className="ml-2 text-3xl disabled:opacity-50">{log.studentLiked ? '👍 Liked' : '👍'}</button>
+                                </div>
+                              )}
+                              <button onClick={() => toggleReplies(log.id)} className="text-lg text-blue-400 mt-1">{showReplies[log.id] ? 'Hide Replies' : 'Show Replies'}</button>
+                              {showReplies[log.id] && (
+                                <div className="mt-2 pl-4 border-l-2 border-slate-500">
+                                  <StudentReplyForm postId={log.id} onAddReply={handleAddReply} />
+                                  <ul className="text-lg mt-2">{replies[log.id]?.map(reply => <li key={reply.id} className="pt-1 flex justify-between items-center"><span>Anonymous: {reply.text}</span></li>)}</ul>
+                                </div>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
                       </div>
 
                       <div className="text-left">
                         <h4 className="font-semibold mt-4 text-2xl text-gray-300">🤔 Reasoning Posts</h4>
-                        <PostList
-                          posts={studentReasoningPosts}
-                          type="student"
-                          onAdminLike={()=>{}}
-                          onPenalty={()=>{}}
-                          onReply={()=>{}}
-                          onStudentAddReply={handleAddReply}
-                          toggleReplies={toggleReplies}
-                          showReplies={showReplies}
-                          replies={replies}
-                          listRef={studentListRefReason}
-                          anonymizeName={false}
-                          getFirstName={getFirstName}
-                        />
+                        <ul ref={studentListRefReason} className="h-[600px] overflow-y-auto text-lg">
+                          {studentReasoningPosts.map((log) => (
+                            <li key={log.id} className="p-2 border-b border-slate-700">
+                              <div>
+                                {log.name === nameInput && log.adminLiked && <span className="mr-2 text-yellow-400 font-bold">👍 by Prof. Ahn (+1 Bonus)</span>}
+                                [{log.type}]: {log.text}
+                              </div>
+                              {log.name === nameInput && log.reply && (
+                                <div className="mt-2 p-2 bg-slate-600 rounded-lg text-lg text-gray-200 flex justify-between items-center">
+                                  <span><b>Prof. Ahn's Reply:</b> {log.reply}</span>
+                                  <button onClick={() => !log.studentLiked && handleStudentLike(log.id)} disabled={log.studentLiked} className="ml-2 text-3xl disabled:opacity-50">{log.studentLiked ? '👍 Liked' : '👍'}</button>
+                                </div>
+                              )}
+                              <button onClick={() => toggleReplies(log.id)} className="text-lg text-blue-400 mt-1">{showReplies[log.id] ? 'Hide Replies' : 'Show Replies'}</button>
+                              {showReplies[log.id] && (
+                                <div className="mt-2 pl-4 border-l-2 border-slate-500">
+                                  <StudentReplyForm postId={log.id} onAddReply={handleAddReply} />
+                                  <ul className="text-lg mt-2">{replies[log.id]?.map(reply => <li key={reply.id} className="pt-1 flex justify-between items-center"><span>Anonymous: {reply.text}</span></li>)}</ul>
+                                </div>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     </div>
                   </div>
@@ -834,6 +971,11 @@ const App = () => {
           </>
         )}
 
+        <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
+          <h3 className="text-3xl font-semibold text-gray-100 mb-4">🏆 {selectedCourse} Talent Leaderboard</h3>
+          <TalentGraph talentsData={talentsLog} type={isAdmin ? 'admin' : 'student'} selectedCourse={selectedCourse} getFirstName={getFirstName}/>
+        </div>
+
         <div className="flex flex-col items-center mt-8 p-4 border-t border-slate-600">
           <p className="text-xl font-medium text-gray-200 mb-2">Admin Login</p>
           <AdminLoginForm onAdminLogin={handleAdminLogin} />
@@ -842,74 +984,6 @@ const App = () => {
     );
   };
 
-  /* Poll UI */
-  const CreatePollForm = ({ onCreatePoll, onDeactivatePoll, activePoll }) => {
-    const [question, setQuestion] = useState(''); const [options, setOptions] = useState(['','','']);
-    const handleOptionChange=(i,v)=>{ const ns=[...options]; ns[i]=v; setOptions(ns); };
-    const addOption=()=>setOptions([...options,'']);
-    const handleSubmit=()=> {
-      const valid = options.filter(o=>o.trim()!=='');
-      if (question.trim() && valid.length>1) { onCreatePoll(question, valid); setQuestion(''); setOptions(['','','']); }
-      else alert("Please provide a question and at least two options.");
-    };
-    if (activePoll) {
-      return (
-        <div className="p-4 border border-slate-600 rounded-xl mb-6">
-          <h3 className="text-3xl font-semibold">Active Poll Results</h3>
-          <PollComponent poll={activePoll} isAdminView={true} userVote={null} />
-          <button onClick={()=>onDeactivatePoll(activePoll.id)} className="w-full p-2 mt-4 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xl">Close Poll</button>
-        </div>
-      );
-    }
-    return (
-      <div className="p-4 border border-slate-600 rounded-xl mb-6">
-        <h3 className="text-3xl font-semibold mb-2">Create New Poll</h3>
-        <input type="text" value={question} onChange={e=>setQuestion(e.target.value)} placeholder="Poll Question"
-          className="w-full p-2 mb-2 bg-slate-700 border border-slate-500 rounded-lg text-xl"/>
-        {options.map((opt,idx)=>(
-          <input key={idx} type="text" value={opt} onChange={e=>handleOptionChange(idx,e.target.value)} placeholder={`Option ${idx+1}`}
-            className="w-full p-2 mb-2 bg-slate-700 border border-slate-500 rounded-lg text-xl"/>
-        ))}
-        <button onClick={addOption} className="text-lg text-blue-400 mb-2">+ Add Option</button>
-        <button onClick={handleSubmit} className="w-full p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xl">Publish Poll</button>
-      </div>
-    );
-  };
-
-  const PollComponent = ({ poll, onVote, userVote, nameInput, isAdminView=false }) => {
-    const results = useMemo(() => {
-      const responses = poll.responses ? Object.values(poll.responses) : [];
-      const totalVotes = responses.length;
-      const votesPerOption = poll.options.map((_,i)=>responses.filter(v=>v===i).length);
-      return { totalVotes, percentages: votesPerOption.map(c=> totalVotes>0 ? (c/totalVotes)*100 : 0) };
-    }, [poll]);
-    const hasVoted = userVote !== null;
-    return (
-      <div className="p-4 border border-orange-500 rounded-xl my-6 bg-slate-700">
-        <h3 className="text-3xl font-semibold text-orange-400 mb-2">{poll.question}</h3>
-        <div className="space-y-2">
-          {poll.options.map((opt, idx) => {
-            const p = results.percentages[idx] || 0;
-            if (hasVoted || isAdminView) {
-              return (
-                <div key={idx} className="p-2 bg-slate-600 rounded-lg">
-                  <div className="flex justify-between text-white mb-1 text-xl"><span>{opt}</span><span>{p.toFixed(0)}%</span></div>
-                  <div className="w-full bg-slate-500 rounded-full h-5"><div className="bg-orange-500 h-5 rounded-full" style={{ width: `${p}%` }} /></div>
-                </div>
-              );
-            }
-            return (
-              <button key={idx} onClick={()=>onVote(poll.id, idx)} className="w-full text-left p-3 bg-slate-600 hover:bg-slate-500 rounded-lg text-xl">
-                {opt}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  /* 포토 + 메인 */
   const PhotoGallery = () => (
     <>
       <div className="flex justify-center items-center gap-2 sm:gap-4 flex-wrap">
