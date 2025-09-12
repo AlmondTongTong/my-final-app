@@ -95,7 +95,11 @@ const TalentGraph = ({ talentsData, type, selectedCourse, getFirstName }) => {
             <span>{t.totalTalents}</span>
           </div>
           <div className="w-full bg-slate-600 rounded-full h-5">
-            <div className="bg-yellow-400 h-5 rounded-full" style={{ width: maxScore>0 ? `${(t.totalTalents/maxScore)*100}%` : '0%'`}} />
+            {/* 🔧 FIXED: removed stray backtick here */}
+            <div
+              className="bg-yellow-400 h-5 rounded-full"
+              style={{ width: maxScore>0 ? `${(t.totalTalents/maxScore)*100}%` : '0%' }}
+            />
           </div>
         </div>
       ))}
@@ -190,7 +194,7 @@ const App = () => {
     ? __app_id
     : (process.env.REACT_APP_APP_ID || 'default-app-id');
 
-  const ADMIN_PASSWORD = '0811'; // 실제 사용
+  const ADMIN_PASSWORD = '0811'; // used
 
   const [db, setDb] = useState(null);
 
@@ -306,7 +310,6 @@ const App = () => {
     const key = (docRef) => docRef.path; // unique
 
     setState([]); // reset before fill
-
     const map = new Map();
 
     appIds.forEach((appId) => {
@@ -495,7 +498,6 @@ const App = () => {
     const today = new Date().toISOString().slice(0,10);
     try {
       await addDoc(collection(db, `/artifacts/${resolvedAppId}/public/data/questions`), {
-        // appId 필드가 없어도 되지만, 앞으로 추적을 위해 넣음
         appId: resolvedAppId,
         name: nameInput, text, type, course: selectedCourse, date: today,
         createdAtClient: Date.now(),
@@ -512,35 +514,24 @@ const App = () => {
     else { showMessage("Incorrect password. 🚫"); }
   };
 
-  const handleReply = useCallback(async (logPathId, replyText) => {
+  const handleReply = useCallback(async (logId, replyText) => {
     if (!db) return;
-    // logPathId는 병합 키(_path)일 수도 있고, id일 수도 있음. 우리 목록은 _path를 가지고 있으니 우선 _path 사용.
-    // 하지만 위 병합 로직에선 setState 시 _path를 넣어둠. 여기서는 기존 appId 저장분에 맞춰 현재 app에서 업데이트 시도.
-    try {
-      // 1) 현재 appId 경로 우선
-      const questionDocRef = doc(db, `/artifacts/${resolvedAppId}/public/data/questions`, logPathId);
-      await updateDoc(questionDocRef, { reply: replyText });
-      showMessage("Reply sent!");
-    } catch {
-      // 2) 실패하면 다른 appId 경로들도 시도
-      const appIds = [resolvedAppId, ...ADDITIONAL_READ_IDS];
-      let done = false;
-      for (const appId of appIds) {
-        try {
-          const questionDocRef = doc(db, `/artifacts/${appId}/public/data/questions`, logPathId);
-          await updateDoc(questionDocRef, { reply: replyText });
-          done = true; break;
-        } catch { /* try next */ }
-      }
-      showMessage(done ? "Reply sent!" : "Failed to send reply.");
+    // 현재 app 먼저, 실패하면 추가 appId들 시도
+    const appIds = [resolvedAppId, ...ADDITIONAL_READ_IDS];
+    for (const appId of appIds) {
+      try {
+        const questionDocRef = doc(db, `/artifacts/${appId}/public/data/questions`, logId);
+        await updateDoc(questionDocRef, { reply: replyText });
+        showMessage("Reply sent!");
+        return;
+      } catch { /* try next */ }
     }
+    showMessage("Failed to send reply.");
   }, [db, resolvedAppId, showMessage]);
 
   const handleAdminLike = useCallback(async (logId, authorFullName) => {
     if(!db) return;
-    // 현재 app 먼저, 실패 시 추가 appId 시도
     const appIds = [resolvedAppId, ...ADDITIONAL_READ_IDS];
-    let updated = false;
     for (const appId of appIds) {
       try {
         const questionDocRef = doc(db, `/artifacts/${appId}/public/data/questions`, logId);
@@ -549,11 +540,10 @@ const App = () => {
           await updateDoc(questionDocRef, { adminLiked: true });
           await modifyTalent(authorFullName, 1, 'post_bonus');
         }
-        updated = true;
-        break;
+        return;
       } catch { /* try next */ }
     }
-    if (!updated) console.error("Error (admin like): not found across appIds");
+    console.error("Error (admin like): not found across appIds");
   }, [db, resolvedAppId, modifyTalent]);
 
   const handleCreatePoll = useCallback(async (question, options) => {
@@ -583,18 +573,8 @@ const App = () => {
   const handleAddReply = useCallback(async (postId, replyText) => {
     if (!db || !nameInput) return;
     if (!replyText || !replyText.trim()) return;
-    // 현재 app 우선
-    try {
-      const repliesColRef = collection(db, `/artifacts/${resolvedAppId}/public/data/questions/${postId}/replies`);
-      await addDoc(repliesColRef, {
-        text: replyText, author: getFirstName(nameInput), authorFullName: nameInput,
-        adminLiked: false, createdAtClient: Date.now(), timestamp: serverTimestamp()
-      });
-      await modifyTalent(nameInput, 1, 'peer_reply');
-      return;
-    } catch {/* try additional */}
-    // 추가 app에서도 시도
-    for (const appId of ADDITIONAL_READ_IDS) {
+    const appIds = [resolvedAppId, ...ADDITIONAL_READ_IDS];
+    for (const appId of appIds) {
       try {
         const repliesColRef = collection(db, `/artifacts/${appId}/public/data/questions/${postId}/replies`);
         await addDoc(repliesColRef, {
@@ -603,20 +583,18 @@ const App = () => {
         });
         await modifyTalent(nameInput, 1, 'peer_reply');
         return;
-      } catch {/* next */}
+      } catch { /* try next */ }
     }
   }, [db, nameInput, getFirstName, resolvedAppId, modifyTalent]);
 
-  /* Replies subscriptions (현재 화면에서 토글 시, 현재 appId 우선 + 추가 appId도 시도) */
+  /* Replies subscriptions (토글 시 다중 appId 병합) */
   const replyUnsubs = useRef({});
   const toggleReplies = useCallback((postId) => {
     setShowReplies(prev => {
       const next = !prev[postId];
       if (next) {
-        // 기존 구독 해제
         replyUnsubs.current[postId]?.forEach(fn => fn && fn());
         replyUnsubs.current[postId] = [];
-
         const appIds = [resolvedAppId, ...ADDITIONAL_READ_IDS];
         const unsubs = appIds.map(appId => {
           const qRef = query(
@@ -624,11 +602,9 @@ const App = () => {
             orderBy("timestamp","asc")
           );
           return onSnapshot(qRef, (snapshot) => {
-            // 여러 appId에서 온 댓글을 합치기
             const fetched = snapshot.docs.map(d => ({ id: `${appId}:${d.id}`, ...d.data() }));
             setReplies(prevR => {
               const prevList = prevR[postId] || [];
-              // 같은 appId에서 들어온 것은 교체 병합
               const others = prevList.filter(x => !fetched.find(y => y.id === x.id));
               return { ...prevR, [postId]: [...others, ...fetched].sort((a,b)=>{
                 const ta = a.timestamp?.seconds || 0;
@@ -1145,7 +1121,6 @@ const App = () => {
 
   const handleStudentLike = useCallback(async (logId) => {
     if (!db) return;
-    // 현재 app 먼저, 추가 app에서도 시도
     const appIds = [resolvedAppId, ...ADDITIONAL_READ_IDS];
     for (const appId of appIds) {
       try {
