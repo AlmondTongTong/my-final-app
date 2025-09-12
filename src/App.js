@@ -84,11 +84,12 @@ const App = () => {
   useEffect(() => { if (!db) return; const talentsQuery = query(collection(db, `/artifacts/${appId}/public/data/talents`), where("course", "==", selectedCourse)); const unsub = onSnapshot(talentsQuery, (snap) => setTalentsLog(snap.docs.map(d => ({ id: d.id, ...d.data() })))); return () => unsub(); }, [db, selectedCourse, appId]);
 
   useEffect(() => { 
-    if (!db || !isAdmin) return; 
+    if (!db || !isAdmin) return;
+    setQuestionsLog([]);
     const questionsQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("date", "==", adminSelectedDate), orderBy("timestamp", "desc")); 
     const unsubQ = onSnapshot(questionsQuery, (snapshot) => {
         setQuestionsLog(prevLogs => {
-            const newLogs = [...prevLogs];
+            let newLogs = [...prevLogs];
             snapshot.docChanges().forEach(change => {
                 const data = { id: change.doc.id, ...change.doc.data() };
                 const index = newLogs.findIndex(log => log.id === data.id);
@@ -116,6 +117,7 @@ const App = () => {
     });
     const talentDocRef = doc(db, `/artifacts/${appId}/public/data/talents`, nameInput); const unsubM = onSnapshot(talentDocRef, (d) => setMyTotalTalents(d.exists() ? d.data().totalTalents : 0));
     
+    setAllPostsLog([]);
     const allPostsQuery = query(collection(db, `/artifacts/${appId}/public/data/questions`), where("course", "==", selectedCourse), where("date", "==", studentSelectedDate), orderBy("timestamp", "desc"));
     const unsubAll = onSnapshot(allPostsQuery, (snapshot) => {
         const posts = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
