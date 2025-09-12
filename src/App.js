@@ -3,8 +3,19 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import {
-  getFirestore, collection, query, where, addDoc, onSnapshot,
-  serverTimestamp, doc, setDoc, getDoc, updateDoc, orderBy
+  getFirestore,
+  collection,
+  collectionGroup,
+  query,
+  where,
+  addDoc,
+  onSnapshot,
+  serverTimestamp,
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  orderBy
 } from 'firebase/firestore';
 
 /* =========================
@@ -14,7 +25,7 @@ const COURSES = ["ADV 375-01", "ADV 375-02", "ADV 461"];
 const COURSE_STUDENTS = {
   "ADV 375-01": ["Donovan, Robert","Ellison, Alexis","Futrell, Rylie","George, Matthew","Hammer, Olivia","Kobayashi, Sena","Lee, Byungho","Mady, Gabriella","Mawuenyega, Chloe","Oved, Liam","Sims, Ava","Soke, Duru","Walsh, William","Warmington, Charles","Yu, Wenbo"],
   "ADV 375-02": ["Alteio, Katherine","Asatryan, Natalie","Bondi, Ava","Brown, Kylie","Calabrese, Ella","Dougherty, Quinn","Dutton, Madeline","Grabinger, Katharina","Ju, Ashley","Lahanas, Dean","Lange, Bella-Soleil","McQuilling, Louisa","Milliman, Nicole","Nizdil, Kennedy","Salahieh, Zayd","Shannon, Savannah","Tang, Yuhan","Walz, Lucy","Wang, Michelle","Wanke, Karsten"],
-  "ADV 461": ["Bonk, Maya","Burrow, Elizabeth","Campos, Victoria","Cantada, Cristian","Chong, Timothy","Chung, Sooa","Cwiertnia, Zachary","Fernandez, Francisco","Fok, Alexis","Gilbert, Jasmine","Hall, Lily","Hosea, Nicholas","Jang, Da Eun","Kim, Lynn","Kim, Noelle","Koning, William","Lee, Edmund","Lewandowski, Luke","Leyson, Noah","Lopez, Tatum","Murphy, Alexander","Swendsen, Katherine"],
+  "ADV 461": ["Bonk, Maya","Burrow, Elizabeth","Campos, Victoria","Cantada, Cristian","Chong, Timothy","Chung, Sooa","Cwiertnia, Zachary","Fernandez, Francisco","Fok, Alexis","Gilbert, Jasmine","Hall, Lily","Hosea, Nicholas","Jang, Da Eun","Kim, Lynn","Kim, Noelle","Koning, William","Lee, Edmund","Lewandowski, Luke","Leyson, Noah","Lopez, Tatum","Murphy, Alexander","Swendsen, Katherine"]
 };
 
 /* =========================
@@ -170,8 +181,19 @@ const PinAuth = React.memo(({ nameInput, isPinRegistered, onLogin, onRegister, g
    Main App
    ========================= */
 const App = () => {
-  const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-  const ADMIN_PASSWORD = '0811'; // actually used in handleAdminLogin
+  // -------- appId 호환: 읽기는 여러 appId 허용, 쓰기는 resolvedAppId에만 ----------
+  const resolvedAppId = (typeof __app_id !== 'undefined' && __app_id)
+    ? __app_id
+    : (process.env.REACT_APP_APP_ID || 'default-app-id');
+  const appIdsForRead = [
+    resolvedAppId,
+    // 필요 시 과거 appId 추가
+    // 'ahn-app',
+    // 'prod',
+  ];
+  const appId = resolvedAppId;
+
+  const ADMIN_PASSWORD = '0811';
   const [db, setDb] = useState(null);
 
   const [nameInput, setNameInput] = useState('');
@@ -193,10 +215,10 @@ const App = () => {
   const [myTotalTalents, setMyTotalTalents] = useState(0);
   const [talentTransactions, setTalentTransactions] = useState([]);
 
-  const [questionsLog, setQuestionsLog] = useState([]);    // admin view master
+  const [questionsLog, setQuestionsLog] = useState([]);    // admin master
   const [feedbackLog, setFeedbackLog] = useState([]);
 
-  const [allPostsLog, setAllPostsLog] = useState([]);      // student view day posts
+  const [allPostsLog, setAllPostsLog] = useState([]);      // student day posts
 
   const [activePoll, setActivePoll] = useState(null);
   const [userPollVote, setUserPollVote] = useState(null);
@@ -294,47 +316,63 @@ const App = () => {
   useEffect(() => {
     if (!db || !isAdmin) return;
     setQuestionsLog([]);
+
+    // Questions/comments & reasoning (읽기: collectionGroup)
     const qQ = query(
-      collection(db, `/artifacts/${appId}/public/data/questions`),
+      collectionGroup(db, 'questions'),
       where("course","==",selectedCourse),
       where("date","==",adminSelectedDate),
-      orderBy("createdAtClient","asc")
+      orderBy("timestamp","asc")
     );
     const unsubQ = onSnapshot(qQ, (snapshot) => {
       setQuestionsLog(prev => {
         const map = new Map(prev.map(x=>[x.id,x]));
         snapshot.docChanges().forEach(ch => {
           const data = { id: ch.doc.id, ...ch.doc.data() };
+          if (data.appId && !appIdsForRead.includes(data.appId)) return; // 다른 appId는 제외
           if (ch.type === "added" || ch.type === "modified") map.set(data.id, data);
           if (ch.type === "removed") map.delete(data.id);
         });
-        return Array.from(map.values()).sort((a,b)=>(a.createdAtClient||0)-(b.createdAtClient||0));
+        // 안전 정렬 (timestamp seconds 기준)
+        return Array.from(map.values()).sort((a,b)=>{
+          const ta = a.timestamp?.seconds || 0;
+          const tb = b.timestamp?.seconds || 0;
+          return ta - tb;
+        });
       });
     });
 
+    // Feedback (읽기: collectionGroup)
     const qF = query(
-      collection(db, `/artifacts/${appId}/public/data/feedback`),
+      collectionGroup(db, 'feedback'),
       where("course","==",selectedCourse),
       where("date","==",adminSelectedDate),
-      orderBy("createdAtClient","asc")
+      orderBy("timestamp","asc")
     );
-    const unsubF = onSnapshot(qF, snap => setFeedbackLog(snap.docs.map(d=>({id:d.id,...d.data()}))));
+    const unsubF = onSnapshot(qF, snap => {
+      const rows = snap.docs.map(d=>({id:d.id,...d.data()})).filter(x => !x.appId || appIdsForRead.includes(x.appId));
+      setFeedbackLog(rows);
+    });
+
     return () => { unsubQ(); unsubF(); };
-  }, [db, selectedCourse, adminSelectedDate, appId, isAdmin]);
+  }, [db, selectedCourse, adminSelectedDate, appIdsForRead, isAdmin]);
 
   /* Admin: per student */
   const [adminStudentLog, setAdminStudentLog] = useState([]);
   useEffect(() => {
     if (!db || !isAdmin || !adminSelectedStudent) { setAdminStudentLog([]); return; }
     const logQuery = query(
-      collection(db, `/artifacts/${appId}/public/data/questions`),
+      collectionGroup(db, 'questions'),
       where("course","==",selectedCourse),
       where("name","==",adminSelectedStudent),
-      orderBy("createdAtClient","asc")
+      orderBy("timestamp","asc")
     );
-    const unsub = onSnapshot(logQuery, snap => setAdminStudentLog(snap.docs.map(d=>({id:d.id,...d.data()}))));
+    const unsub = onSnapshot(logQuery, snap => {
+      const rows = snap.docs.map(d=>({id:d.id,...d.data()})).filter(x => !x.appId || appIdsForRead.includes(x.appId));
+      setAdminStudentLog(rows);
+    });
     return () => unsub();
-  }, [db, selectedCourse, adminSelectedStudent, appId, isAdmin]);
+  }, [db, selectedCourse, adminSelectedStudent, appIdsForRead, isAdmin]);
 
   /* Student view */
   const studentListRefQC = useRef(null);
@@ -365,13 +403,14 @@ const App = () => {
 
     setAllPostsLog([]);
     const allPostsQuery = query(
-      collection(db, `/artifacts/${appId}/public/data/questions`),
+      collectionGroup(db, 'questions'),
       where("course","==",selectedCourse),
       where("date","==",studentSelectedDate),
-      orderBy("createdAtClient","asc")
+      orderBy("timestamp","asc")
     );
     const unsubAll = onSnapshot(allPostsQuery, snapshot => {
-      const posts = snapshot.docs.map(d=>({id:d.id,...d.data()}));
+      const posts = snapshot.docs.map(d=>({id:d.id,...d.data()}))
+        .filter(p => !p.appId || appIdsForRead.includes(p.appId));
       setAllPostsLog(posts);
       const myPosts = posts.filter(p => p.name === nameInput);
       setDailyProgress({
@@ -380,17 +419,18 @@ const App = () => {
       });
     });
 
+    // 내 피드백 로그(표시용)
     const feedbackQuery = query(
-      collection(db, `/artifacts/${appId}/public/data/feedback`),
+      collectionGroup(db, 'feedback'),
       where("course","==",selectedCourse),
       where("name","==",nameInput),
       where("date","==",studentSelectedDate),
-      orderBy("createdAtClient","asc")
+      orderBy("timestamp","asc")
     );
     const unsubF = onSnapshot(feedbackQuery, () => {});
 
     return () => { unsubM(); unsubT(); unsubAll(); unsubF(); };
-  }, [db, selectedCourse, nameInput, studentSelectedDate, appId, isAdmin, isAuthenticated]);
+  }, [db, selectedCourse, nameInput, studentSelectedDate, appIdsForRead, appId, isAdmin, isAuthenticated]);
 
   /* Polls */
   useEffect(() => {
@@ -430,6 +470,7 @@ const App = () => {
     const today = new Date().toISOString().slice(0,10);
     try {
       await addDoc(collection(db, `/artifacts/${appId}/public/data/questions`), {
+        appId, // 저장 시 appId 동시 저장 (레거시/멀티앱 구분)
         name: nameInput, text, type, course: selectedCourse, date: today,
         createdAtClient: Date.now(),
         timestamp: serverTimestamp(),
@@ -494,6 +535,7 @@ const App = () => {
     const repliesColRef = collection(db, `/artifacts/${appId}/public/data/questions/${postId}/replies`);
     try {
       await addDoc(repliesColRef, {
+        appId,
         text: replyText, author: getFirstName(nameInput), authorFullName: nameInput,
         adminLiked: false, createdAtClient: Date.now(), timestamp: serverTimestamp()
       });
@@ -509,7 +551,7 @@ const App = () => {
       if (next) {
         const repliesQuery = query(
           collection(db, `/artifacts/${appId}/public/data/questions/${postId}/replies`),
-          orderBy("createdAtClient","asc")
+          orderBy("timestamp","asc")
         );
         replyUnsubs.current[postId]?.();
         replyUnsubs.current[postId] = onSnapshot(repliesQuery, (snapshot) => {
@@ -547,11 +589,13 @@ const App = () => {
     return init;
   }, [questionsLog, selectedCourse]);
 
-  /* Derived lists for student view (not using useMemo to avoid ESLint dep warnings) */
+  /* Derived lists for student/admin views */
+  const qcPostsAdmin = questionsLog.filter(p=>p.type==='question_comment');
+  const reasoningPostsAdmin = questionsLog.filter(p=>p.type==='reasoning');
   const studentReasoningPosts = allPostsLog.filter(p => p.type === 'reasoning');
   const studentQcPosts = allPostsLog.filter(p => p.type === 'question_comment');
 
-  /* Small components inside App to have access to handlers via props */
+  /* Small components inside App */
   const ReplyForm = ({ log, onReply }) => {
     const [replyText, setReplyText] = useState(log.reply || '');
     return (
@@ -678,10 +722,6 @@ const App = () => {
 
   const MainContent = ({ handleFeedback, handleVerbalParticipation, handleStudentLike }) => {
     const penalty = (studentName) => modifyTalent(studentName, -1, 'penalty');
-
-    // Lists for admin
-    const qcPostsAdmin = questionsLog.filter(p=>p.type==='question_comment');
-    const reasoningPostsAdmin = questionsLog.filter(p=>p.type==='reasoning');
 
     return (
       <div className="w-full max-w-4xl p-6 bg-slate-800 text-white rounded-xl shadow-lg box-shadow-custom">
@@ -971,11 +1011,6 @@ const App = () => {
           </>
         )}
 
-        <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
-          <h3 className="text-3xl font-semibold text-gray-100 mb-4">🏆 {selectedCourse} Talent Leaderboard</h3>
-          <TalentGraph talentsData={talentsLog} type={isAdmin ? 'admin' : 'student'} selectedCourse={selectedCourse} getFirstName={getFirstName}/>
-        </div>
-
         <div className="flex flex-col items-center mt-8 p-4 border-t border-slate-600">
           <p className="text-xl font-medium text-gray-200 mb-2">Admin Login</p>
           <AdminLoginForm onAdminLogin={handleAdminLogin} />
@@ -1009,6 +1044,7 @@ const App = () => {
     setTimeout(() => setClickedButton(null), 1500);
     try {
       await addDoc(collection(db, `/artifacts/${appId}/public/data/feedback`), {
+        appId,
         name: nameInput,
         status,
         course: selectedCourse,
