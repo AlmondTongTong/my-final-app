@@ -29,6 +29,14 @@ const COURSE_STUDENTS = {
 };
 
 /* =========================
+   Env helpers (build-time constants)
+   ========================= */
+const ADDITIONAL_READ_IDS = (process.env.REACT_APP_ADDITIONAL_READ_APP_IDS || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
+/* =========================
    Utils
    ========================= */
 const safeTime = (ts) => { try { return ts?.toDate?.().toLocaleTimeString() || ''; } catch { return ''; } };
@@ -181,17 +189,10 @@ const PinAuth = React.memo(({ nameInput, isPinRegistered, onLogin, onRegister, g
    Main App
    ========================= */
 const App = () => {
-  // -------- appId 호환: 읽기는 여러 appId 허용, 쓰기는 resolvedAppId에만 ----------
+  // appId 해석
   const resolvedAppId = (typeof __app_id !== 'undefined' && __app_id)
     ? __app_id
     : (process.env.REACT_APP_APP_ID || 'default-app-id');
-  const appIdsForRead = [
-    resolvedAppId,
-    // 필요 시 과거 appId 추가
-    // 'ahn-app',
-    // 'prod',
-  ];
-  const appId = resolvedAppId;
 
   const ADMIN_PASSWORD = '0811';
   const [db, setDb] = useState(null);
@@ -259,37 +260,37 @@ const App = () => {
   useEffect(() => {
     if (!db || !nameInput) { setIsPinRegistered(false); return; }
     const checkPin = async () => {
-      const pinDocRef = doc(db, `/artifacts/${appId}/public/data/studentPins`, nameInput);
+      const pinDocRef = doc(db, `/artifacts/${resolvedAppId}/public/data/studentPins`, nameInput);
       const docSnap = await getDoc(pinDocRef);
       setIsPinRegistered(docSnap.exists());
     };
     checkPin();
-  }, [db, nameInput, appId]);
+  }, [db, nameInput, resolvedAppId]);
 
   const handleNameChange = (newName) => { setNameInput(newName); setIsAuthenticated(false); };
 
   const handlePinLogin = useCallback(async (pin) => {
     if (!db || !nameInput) return showMessage("Please select your name first.");
-    const pinDocRef = doc(db, `/artifacts/${appId}/public/data/studentPins`, nameInput);
+    const pinDocRef = doc(db, `/artifacts/${resolvedAppId}/public/data/studentPins`, nameInput);
     try {
       const docSnap = await getDoc(pinDocRef);
       if (docSnap.exists() && docSnap.data().pin === pin) {
         setIsAuthenticated(true); showMessage(`Welcome, ${getFirstName(nameInput)}!`);
       } else { showMessage("Incorrect PIN."); }
     } catch { showMessage("Login error."); }
-  }, [db, nameInput, appId, getFirstName, showMessage]);
+  }, [db, nameInput, resolvedAppId, getFirstName, showMessage]);
 
   const handlePinRegister = useCallback(async (pin, confirmation) => {
     if (!db || !nameInput) return showMessage("Please select your name first.");
     if (pin.length !== 4) return showMessage("PIN must be 4 digits.");
     if (pin !== confirmation) return showMessage("PINs do not match.");
-    const pinDocRef = doc(db, `/artifacts/${appId}/public/data/studentPins`, nameInput);
+    const pinDocRef = doc(db, `/artifacts/${resolvedAppId}/public/data/studentPins`, nameInput);
     try {
       await setDoc(pinDocRef, { pin });
       setIsAuthenticated(true);
       showMessage(`PIN registered! Welcome, ${getFirstName(nameInput)}!`);
     } catch { showMessage("Error registering PIN."); }
-  }, [db, nameInput, appId, getFirstName, showMessage]);
+  }, [db, nameInput, resolvedAppId, getFirstName, showMessage]);
 
   /* Class time check */
   useEffect(() => {
@@ -302,10 +303,10 @@ const App = () => {
   /* Talents */
   useEffect(() => {
     if (!db) return;
-    const talentsQuery = query(collection(db, `/artifacts/${appId}/public/data/talents`), where("course","==",selectedCourse));
+    const talentsQuery = query(collection(db, `/artifacts/${resolvedAppId}/public/data/talents`), where("course","==",selectedCourse));
     const unsub = onSnapshot(talentsQuery, snap => setTalentsLog(snap.docs.map(d=>({id:d.id,...d.data()}))));
     return () => unsub();
-  }, [db, selectedCourse, appId]);
+  }, [db, selectedCourse, resolvedAppId]);
 
   /* Admin lists */
   const adminListRefQC = useRef(null);
@@ -317,7 +318,10 @@ const App = () => {
     if (!db || !isAdmin) return;
     setQuestionsLog([]);
 
-    // Questions/comments & reasoning (읽기: collectionGroup)
+    // 읽기용 appIds (deps는 resolvedAppId만)
+    const appIdsForRead = [resolvedAppId, ...ADDITIONAL_READ_IDS];
+
+    // Questions/comments & reasoning
     const qQ = query(
       collectionGroup(db, 'questions'),
       where("course","==",selectedCourse),
@@ -329,11 +333,10 @@ const App = () => {
         const map = new Map(prev.map(x=>[x.id,x]));
         snapshot.docChanges().forEach(ch => {
           const data = { id: ch.doc.id, ...ch.doc.data() };
-          if (data.appId && !appIdsForRead.includes(data.appId)) return; // 다른 appId는 제외
+          if (data.appId && !appIdsForRead.includes(data.appId)) return;
           if (ch.type === "added" || ch.type === "modified") map.set(data.id, data);
           if (ch.type === "removed") map.delete(data.id);
         });
-        // 안전 정렬 (timestamp seconds 기준)
         return Array.from(map.values()).sort((a,b)=>{
           const ta = a.timestamp?.seconds || 0;
           const tb = b.timestamp?.seconds || 0;
@@ -342,7 +345,7 @@ const App = () => {
       });
     });
 
-    // Feedback (읽기: collectionGroup)
+    // Feedback
     const qF = query(
       collectionGroup(db, 'feedback'),
       where("course","==",selectedCourse),
@@ -355,12 +358,15 @@ const App = () => {
     });
 
     return () => { unsubQ(); unsubF(); };
-  }, [db, selectedCourse, adminSelectedDate, appIdsForRead, isAdmin]);
+  }, [db, selectedCourse, adminSelectedDate, resolvedAppId, isAdmin]);
 
   /* Admin: per student */
   const [adminStudentLog, setAdminStudentLog] = useState([]);
   useEffect(() => {
     if (!db || !isAdmin || !adminSelectedStudent) { setAdminStudentLog([]); return; }
+
+    const appIdsForRead = [resolvedAppId, ...ADDITIONAL_READ_IDS];
+
     const logQuery = query(
       collectionGroup(db, 'questions'),
       where("course","==",selectedCourse),
@@ -372,7 +378,7 @@ const App = () => {
       setAdminStudentLog(rows);
     });
     return () => unsub();
-  }, [db, selectedCourse, adminSelectedStudent, appIdsForRead, isAdmin]);
+  }, [db, selectedCourse, adminSelectedStudent, resolvedAppId, isAdmin]);
 
   /* Student view */
   const studentListRefQC = useRef(null);
@@ -386,8 +392,11 @@ const App = () => {
       setDailyProgress({ question_comment: 0, reasoning: 0 });
       return;
     }
+
+    const appIdsForRead = [resolvedAppId, ...ADDITIONAL_READ_IDS];
+
     const transactionsQuery = query(
-      collection(db, `/artifacts/${appId}/public/data/talentTransactions`),
+      collection(db, `/artifacts/${resolvedAppId}/public/data/talentTransactions`),
       where("name","==",nameInput),
       orderBy("timestamp","desc")
     );
@@ -398,7 +407,7 @@ const App = () => {
       setVerbalParticipationCount(todays.filter(t => t.type === 'verbal_participation').length);
     });
 
-    const talentDocRef = doc(db, `/artifacts/${appId}/public/data/talents`, nameInput);
+    const talentDocRef = doc(db, `/artifacts/${resolvedAppId}/public/data/talents`, nameInput);
     const unsubM = onSnapshot(talentDocRef, d => setMyTotalTalents(d.exists()? d.data().totalTalents : 0));
 
     setAllPostsLog([]);
@@ -419,7 +428,7 @@ const App = () => {
       });
     });
 
-    // 내 피드백 로그(표시용)
+    // 내 피드백 로그(표시만)
     const feedbackQuery = query(
       collectionGroup(db, 'feedback'),
       where("course","==",selectedCourse),
@@ -430,13 +439,16 @@ const App = () => {
     const unsubF = onSnapshot(feedbackQuery, () => {});
 
     return () => { unsubM(); unsubT(); unsubAll(); unsubF(); };
-  }, [db, selectedCourse, nameInput, studentSelectedDate, appIdsForRead, appId, isAdmin, isAuthenticated]);
+  }, [db, selectedCourse, nameInput, studentSelectedDate, resolvedAppId, isAdmin, isAuthenticated]);
 
   /* Polls */
   useEffect(() => {
     if (!db || !isAuthenticated) { setActivePoll(null); return; }
-    const pollQuery = query(collection(db, `/artifacts/${appId}/public/data/polls`),
-      where("course","==",selectedCourse), where("isActive","==",true));
+    const pollQuery = query(
+      collection(db, `/artifacts/${resolvedAppId}/public/data/polls`),
+      where("course","==",selectedCourse),
+      where("isActive","==",true)
+    );
     const unsubscribe = onSnapshot(pollQuery, snapshot => {
       if (!snapshot.empty) {
         const pollData = snapshot.docs[0].data(); const pollId = snapshot.docs[0].id;
@@ -446,13 +458,13 @@ const App = () => {
       } else setActivePoll(null);
     });
     return () => unsubscribe();
-  }, [db, selectedCourse, isAuthenticated, nameInput, appId]);
+  }, [db, selectedCourse, isAuthenticated, nameInput, resolvedAppId]);
 
   /* Actions */
   const modifyTalent = useCallback(async (studentName, amount, type) => {
     if (!db) return;
-    const talentDocRef = doc(db, `/artifacts/${appId}/public/data/talents`, studentName);
-    const transactionColRef = collection(db, `/artifacts/${appId}/public/data/talentTransactions`);
+    const talentDocRef = doc(db, `/artifacts/${resolvedAppId}/public/data/talents`, studentName);
+    const transactionColRef = collection(db, `/artifacts/${resolvedAppId}/public/data/talentTransactions`);
     try {
       const docSnap = await getDoc(talentDocRef);
       let currentTalents = docSnap.exists() ? docSnap.data().totalTalents || 0 : 0;
@@ -463,14 +475,14 @@ const App = () => {
       if(type !== 'automatic') showMessage(`${getFirstName(studentName)} received ${amount > 0 ? `+${amount}` : amount} Talent!`);
       await addDoc(transactionColRef, { name: studentName, points: amount, type, timestamp: serverTimestamp() });
     } catch (e) { console.error("Error modifying talent: ", e); }
-  }, [db, appId, selectedCourse, getFirstName, showMessage]);
+  }, [db, resolvedAppId, selectedCourse, getFirstName, showMessage]);
 
   const handleAddContent = useCallback(async (text, type) => {
     if (!db || !nameInput.trim() || !text.trim()) return;
     const today = new Date().toISOString().slice(0,10);
     try {
-      await addDoc(collection(db, `/artifacts/${appId}/public/data/questions`), {
-        appId, // 저장 시 appId 동시 저장 (레거시/멀티앱 구분)
+      await addDoc(collection(db, `/artifacts/${resolvedAppId}/public/data/questions`), {
+        appId: resolvedAppId,
         name: nameInput, text, type, course: selectedCourse, date: today,
         createdAtClient: Date.now(),
         timestamp: serverTimestamp(),
@@ -479,23 +491,23 @@ const App = () => {
       showMessage("Submission complete! ✅");
       await modifyTalent(nameInput, 1, 'automatic');
     } catch { showMessage("Submission failed. ❌"); }
-  }, [db, nameInput, selectedCourse, appId, modifyTalent, showMessage]);
+  }, [db, nameInput, selectedCourse, resolvedAppId, modifyTalent, showMessage]);
 
   const handleAdminLogin = (password) => {
-    if (password === ADMIN_PASSWORD) { setIsAdmin(true); showMessage("Admin Login successful! 🔑"); }
+    if (password === '0811') { setIsAdmin(true); showMessage("Admin Login successful! 🔑"); }
     else showMessage("Incorrect password. 🚫");
   };
 
   const handleReply = useCallback(async (logId, replyText) => {
     if (!db) return;
-    const questionDocRef = doc(db, `/artifacts/${appId}/public/data/questions`, logId);
+    const questionDocRef = doc(db, `/artifacts/${resolvedAppId}/public/data/questions`, logId);
     try { await updateDoc(questionDocRef, { reply: replyText }); showMessage("Reply sent!"); }
     catch (e) { showMessage("Failed to send reply."); console.error(e); }
-  }, [db, appId, showMessage]);
+  }, [db, resolvedAppId, showMessage]);
 
   const handleAdminLike = useCallback(async (logId, authorFullName) => {
     if(!db) return;
-    const questionDocRef = doc(db, `/artifacts/${appId}/public/data/questions`, logId);
+    const questionDocRef = doc(db, `/artifacts/${resolvedAppId}/public/data/questions`, logId);
     try {
       const docSnap = await getDoc(questionDocRef);
       if (docSnap.exists() && !docSnap.data().adminLiked) {
@@ -503,45 +515,45 @@ const App = () => {
         await modifyTalent(authorFullName, 1, 'post_bonus');
       }
     } catch (e) { console.error("Error (admin like):", e) }
-  }, [db, appId, modifyTalent]);
+  }, [db, resolvedAppId, modifyTalent]);
 
   const handleCreatePoll = useCallback(async (question, options) => {
     if (!db || !isAdmin) return;
     try {
-      await addDoc(collection(db, `/artifacts/${appId}/public/data/polls`), {
+      await addDoc(collection(db, `/artifacts/${resolvedAppId}/public/data/polls`), {
         question, options, course: selectedCourse, isActive: true, responses: {}, timestamp: serverTimestamp()
       });
       showMessage("Poll published successfully!");
     } catch (e) { showMessage("Error publishing poll."); console.error("Error creating poll: ", e); }
-  }, [db, isAdmin, selectedCourse, appId, showMessage]);
+  }, [db, isAdmin, selectedCourse, resolvedAppId, showMessage]);
 
   const handlePollVote = useCallback(async (pollId, optionIndex) => {
     if (!db || !nameInput) return;
-    const pollDocRef = doc(db, `/artifacts/${appId}/public/data/polls`, pollId);
+    const pollDocRef = doc(db, `/artifacts/${resolvedAppId}/public/data/polls`, pollId);
     try { await updateDoc(pollDocRef, { [`responses.${nameInput}`]: optionIndex }); }
     catch (e) { console.error("Error voting on poll: ", e); }
-  }, [db, nameInput, appId]);
+  }, [db, nameInput, resolvedAppId]);
 
   const handleDeactivatePoll = useCallback(async (pollId) => {
     if (!db || !isAdmin) return;
-    const pollDocRef = doc(db, `/artifacts/${appId}/public/data/polls`, pollId);
+    const pollDocRef = doc(db, `/artifacts/${resolvedAppId}/public/data/polls`, pollId);
     try { await updateDoc(pollDocRef, { isActive: false }); showMessage("Poll closed."); }
     catch (e) { showMessage("Error closing poll."); console.error("Error deactivating poll: ", e); }
-  }, [db, isAdmin, appId, showMessage]);
+  }, [db, isAdmin, resolvedAppId, showMessage]);
 
   const handleAddReply = useCallback(async (postId, replyText) => {
     if (!db || !nameInput) return;
     if (!replyText || !replyText.trim()) return;
-    const repliesColRef = collection(db, `/artifacts/${appId}/public/data/questions/${postId}/replies`);
+    const repliesColRef = collection(db, `/artifacts/${resolvedAppId}/public/data/questions/${postId}/replies`);
     try {
       await addDoc(repliesColRef, {
-        appId,
+        appId: resolvedAppId,
         text: replyText, author: getFirstName(nameInput), authorFullName: nameInput,
         adminLiked: false, createdAtClient: Date.now(), timestamp: serverTimestamp()
       });
       await modifyTalent(nameInput, 1, 'peer_reply');
     } catch (e) { console.error("Error adding reply: ", e); }
-  }, [db, nameInput, getFirstName, appId, modifyTalent]);
+  }, [db, nameInput, getFirstName, resolvedAppId, modifyTalent]);
 
   /* Replies subscriptions */
   const replyUnsubs = useRef({});
@@ -550,7 +562,7 @@ const App = () => {
       const next = !prev[postId];
       if (next) {
         const repliesQuery = query(
-          collection(db, `/artifacts/${appId}/public/data/questions/${postId}/replies`),
+          collection(db, `/artifacts/${resolvedAppId}/public/data/questions/${postId}/replies`),
           orderBy("timestamp","asc")
         );
         replyUnsubs.current[postId]?.();
@@ -564,7 +576,7 @@ const App = () => {
       }
       return { ...prev, [postId]: next };
     });
-  }, [db, appId]);
+  }, [db, resolvedAppId]);
 
   useEffect(() => {
     return () => {
@@ -1037,14 +1049,14 @@ const App = () => {
     </>
   );
 
-  /* ===== Handlers placed BEFORE PhotoGallery usage (to avoid no-undef) ===== */
+  /* ===== Handlers BEFORE PhotoGallery usage ===== */
   const handleFeedback = useCallback(async (status) => {
     if (!db || !nameInput.trim()) return;
     setClickedButton(status);
     setTimeout(() => setClickedButton(null), 1500);
     try {
-      await addDoc(collection(db, `/artifacts/${appId}/public/data/feedback`), {
-        appId,
+      await addDoc(collection(db, `/artifacts/${resolvedAppId}/public/data/feedback`), {
+        appId: resolvedAppId,
         name: nameInput,
         status,
         course: selectedCourse,
@@ -1056,7 +1068,7 @@ const App = () => {
     } catch (e) {
       console.error(e);
     }
-  }, [db, nameInput, selectedCourse, appId, showMessage]);
+  }, [db, nameInput, selectedCourse, resolvedAppId, showMessage]);
 
   const handleVerbalParticipation = useCallback(() => {
     if (!db || !nameInput) return;
@@ -1066,13 +1078,13 @@ const App = () => {
 
   const handleStudentLike = useCallback(async (logId) => {
     if (!db) return;
-    const questionDocRef = doc(db, `/artifacts/${appId}/public/data/questions`, logId);
+    const questionDocRef = doc(db, `/artifacts/${resolvedAppId}/public/data/questions`, logId);
     try {
       await updateDoc(questionDocRef, { studentLiked: true });
     } catch (e) {
       console.error("Error (student like):", e);
     }
-  }, [db, appId]);
+  }, [db, resolvedAppId]);
 
   return (
     <div className="min-h-screen w-full bg-custom-beige-bg flex flex-col justify-between p-2 sm:p-4">
