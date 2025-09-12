@@ -194,7 +194,9 @@ const App = () => {
     ? __app_id
     : (process.env.REACT_APP_APP_ID || 'default-app-id');
 
+  // ✅ ESLint 경고 방지: 실제로 아래에서 사용함
   const ADMIN_PASSWORD = '0811';
+
   const [db, setDb] = useState(null);
 
   const [nameInput, setNameInput] = useState('');
@@ -493,9 +495,14 @@ const App = () => {
     } catch { showMessage("Submission failed. ❌"); }
   }, [db, nameInput, selectedCourse, resolvedAppId, modifyTalent, showMessage]);
 
+  // ✅ ADMIN_PASSWORD 실제 사용
   const handleAdminLogin = (password) => {
-    if (password === '0811') { setIsAdmin(true); showMessage("Admin Login successful! 🔑"); }
-    else showMessage("Incorrect password. 🚫");
+    if (password === ADMIN_PASSWORD) {
+      setIsAdmin(true);
+      showMessage("Admin Login successful! 🔑");
+    } else {
+      showMessage("Incorrect password. 🚫");
+    }
   };
 
   const handleReply = useCallback(async (logId, replyText) => {
