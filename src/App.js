@@ -299,7 +299,7 @@ const App = () => {
       collection(db, `/artifacts/${appId}/public/data/questions`),
       where("course","==",selectedCourse),
       where("date","==",adminSelectedDate),
-      orderBy("createdAtClient","asc") // 안정 정렬
+      orderBy("createdAtClient","asc")
     );
     const unsubQ = onSnapshot(qQ, (snapshot) => {
       setQuestionsLog(prev => {
@@ -367,7 +367,7 @@ const App = () => {
       collection(db, `/artifacts/${appId}/public/data/questions`),
       where("course","==",selectedCourse),
       where("date","==",studentSelectedDate),
-      orderBy("createdAtClient","asc") // 안정 정렬
+      orderBy("createdAtClient","asc")
     );
     const unsubAll = onSnapshot(allPostsQuery, snapshot => {
       const posts = snapshot.docs.map(d=>({id:d.id,...d.data()}));
@@ -430,8 +430,8 @@ const App = () => {
     try {
       await addDoc(collection(db, `/artifacts/${appId}/public/data/questions`), {
         name: nameInput, text, type, course: selectedCourse, date: today,
-        createdAtClient: Date.now(),               // 안정 정렬용
-        timestamp: serverTimestamp(),              // 기록용
+        createdAtClient: Date.now(),
+        timestamp: serverTimestamp(),
         studentLiked: false, adminLiked: false
       });
       showMessage("Submission complete! ✅");
@@ -606,7 +606,11 @@ const App = () => {
     );
   };
 
-  const PostList = React.memo(function PostList({ posts, type, onAdminLike, onPenalty, onReply, toggleReplies, showReplies, replies, listRef, anonymizeName, getFirstName }) {
+  // ✅ onStudentAddReply 추가(학생 뷰에서만 사용)
+  const PostList = React.memo(function PostList({
+    posts, type, onAdminLike, onPenalty, onReply, onStudentAddReply,
+    toggleReplies, showReplies, replies, listRef, anonymizeName, getFirstName
+  }) {
     return (
       <ul ref={listRef} className="h-[600px] overflow-y-auto text-xl mt-2">
         {posts.map((log) => (
@@ -627,7 +631,7 @@ const App = () => {
             {showReplies[log.id] && (
               <div className="mt-2 pl-4 border-l-2 border-slate-500">
                 <ul className="text-lg mt-2">{replies[log.id]?.map(r => <li key={r.id} className="pt-1 flex justify-between items-center"><span>{anonymizeName ? "Anonymous" : r.author}: {r.text}</span></li>)}</ul>
-                {type!=='admin' && <StudentReplyForm postId={log.id} onAddReply={onAddReply} />}
+                {type!=='admin' && <StudentReplyForm postId={log.id} onAddReply={onStudentAddReply || (()=>{})} />}
               </div>
             )}
           </li>
@@ -845,6 +849,7 @@ const App = () => {
                           onAdminLike={()=>{}}
                           onPenalty={()=>{}}
                           onReply={()=>{}}
+                          onStudentAddReply={handleAddReply}   // ✅ 학생 답글 핸들러 전달
                           toggleReplies={toggleReplies}
                           showReplies={showReplies}
                           replies={replies}
@@ -862,6 +867,7 @@ const App = () => {
                           onAdminLike={()=>{}}
                           onPenalty={()=>{}}
                           onReply={()=>{}}
+                          onStudentAddReply={handleAddReply}   // ✅ 학생 답글 핸들러 전달
                           toggleReplies={toggleReplies}
                           showReplies={showReplies}
                           replies={replies}
