@@ -17,6 +17,16 @@ const COURSE_STUDENTS = {
   "ADV 461": ["Bonk, Maya","Burrow, Elizabeth","Campos, Victoria","Cantada, Cristian","Chong, Timothy","Chung, Sooa","Cwiertnia, Zachary","Fernandez, Francisco","Fok, Alexis","Gilbert, Jasmine","Hall, Lily","Hosea, Nicholas","Jang, Da Eun","Kim, Lynn","Kim, Noelle","Koning, William","Lee, Edmund","Lewandowski, Luke","Leyson, Noah","Lopez, Tatum","Murphy, Alexander","Swendsen, Katherine"],
 };
 
+/* =========================
+   유틸: 시간/날짜 안전 포맷
+   ========================= */
+const safeTime = (ts) => {
+  try { if (!ts || !ts.toDate) return ''; return ts.toDate().toLocaleTimeString(); } catch { return ''; }
+};
+const safeDate = (ts) => {
+  try { if (!ts || !ts.toDate) return ''; return ts.toDate().toLocaleDateString(); } catch { return ''; }
+};
+
 const isWithinClassTime = (courseName) => {
   const now = new Date();
   const losAngelesTime = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
@@ -44,9 +54,7 @@ function usePreserveScroll(ref, deps) {
     const el = ref.current;
     if (!el) return;
     const prevBottom = el.scrollHeight - el.scrollTop;
-    // deps 변경 직전 스냅샷
     requestAnimationFrame(() => {
-      // deps 변경 후 한 프레임에 보정
       if (!el) return;
       el.scrollTop = el.scrollHeight - prevBottom;
     });
@@ -82,7 +90,10 @@ const TalentGraph = ({ talentsData, type, selectedCourse, getFirstName }) => {
             <span>{t.totalTalents}</span>
           </div>
           <div className="w-full bg-slate-600 rounded-full h-5">
-            <div className="bg-yellow-400 h-5 rounded-full" style={{ width: maxScore>0 ? `${(t.totalTalents/maxScore)*100}%` : '0%'`}} />
+            <div
+              className="bg-yellow-400 h-5 rounded-full"
+              style={{ width: maxScore > 0 ? `${(t.totalTalents / maxScore) * 100}%` : '0%' }}
+            />
           </div>
         </div>
       ))}
@@ -94,7 +105,7 @@ const TalentGraph = ({ talentsData, type, selectedCourse, getFirstName }) => {
    폼(입력 보존: localStorage)
    ========================= */
 const ContentForm = React.memo(({ formKey, type, onAddContent, isEnabled, placeholder }) => {
-  const STORAGE_KEY = `draft:${formKey}:${type}`;
+  const STORAGE_KEY = 'draft:' + formKey + ':' + type; // 보수적: 템플릿 리터럴 대신 문자열 연결
   const [text, setText] = useState(() => localStorage.getItem(STORAGE_KEY) || '');
 
   const onChange = (e) => {
@@ -288,7 +299,7 @@ const App = () => {
       collection(db, `/artifacts/${appId}/public/data/questions`),
       where("course","==",selectedCourse),
       where("date","==",adminSelectedDate),
-      orderBy("createdAtClient","asc") // ★ 안정 정렬
+      orderBy("createdAtClient","asc") // 안정 정렬
     );
     const unsubQ = onSnapshot(qQ, (snapshot) => {
       setQuestionsLog(prev => {
@@ -328,7 +339,6 @@ const App = () => {
   /* Student view: 내 데이터/전체 포스트 */
   const studentListRefQC = useRef(null);
   const studentListRefReason = useRef(null);
-
   usePreserveScroll(studentListRefQC, [allPostsLog.length]);
   usePreserveScroll(studentListRefReason, [allPostsLog.length]);
 
@@ -357,7 +367,7 @@ const App = () => {
       collection(db, `/artifacts/${appId}/public/data/questions`),
       where("course","==",selectedCourse),
       where("date","==",studentSelectedDate),
-      orderBy("createdAtClient","asc") // ★ 안정 정렬
+      orderBy("createdAtClient","asc") // 안정 정렬
     );
     const unsubAll = onSnapshot(allPostsQuery, snapshot => {
       const posts = snapshot.docs.map(d=>({id:d.id,...d.data()}));
@@ -420,7 +430,7 @@ const App = () => {
     try {
       await addDoc(collection(db, `/artifacts/${appId}/public/data/questions`), {
         name: nameInput, text, type, course: selectedCourse, date: today,
-        createdAtClient: Date.now(),               // ★ 추가: 안정 정렬용
+        createdAtClient: Date.now(),               // 안정 정렬용
         timestamp: serverTimestamp(),              // 기록용
         studentLiked: false, adminLiked: false
       });
@@ -442,7 +452,7 @@ const App = () => {
   }, [db, nameInput, selectedCourse, appId, showMessage]);
 
   const handleAdminLogin = (password) => {
-    if (password === '0811') { setIsAdmin(true); showMessage("Admin Login successful! 🔑"); }
+    if (password === ADMIN_PASSWORD) { setIsAdmin(true); showMessage("Admin Login successful! 🔑"); }
     else showMessage("Incorrect password. 🚫");
   };
 
@@ -617,7 +627,7 @@ const App = () => {
             {showReplies[log.id] && (
               <div className="mt-2 pl-4 border-l-2 border-slate-500">
                 <ul className="text-lg mt-2">{replies[log.id]?.map(r => <li key={r.id} className="pt-1 flex justify-between items-center"><span>{anonymizeName ? "Anonymous" : r.author}: {r.text}</span></li>)}</ul>
-                {type!=='admin' && <StudentReplyForm postId={log.id} onAddReply={handleAddReply} />}
+                {type!=='admin' && <StudentReplyForm postId={log.id} onAddReply={onAddReply} />}
               </div>
             )}
           </li>
@@ -707,8 +717,7 @@ const App = () => {
                     <ul className="h-40 overflow-y-auto text-lg">
                       {feedbackLog.map((log)=>(
                         <li key={log.id} className="p-2 border-b border-slate-700">
-                          ({log.timestamp?.toDate().toLocaleTimeString?.() || ''})
-                          {isAdminAnonymousMode ? "Anonymous" : getFirstName(log.name)}: {log.status}
+                          ({safeTime(log.timestamp)}) {isAdminAnonymousMode ? "Anonymous" : getFirstName(log.name)}: {log.status}
                         </li>
                       ))}
                     </ul>
@@ -818,7 +827,7 @@ const App = () => {
                     {talentTransactions.map((log,i)=>(
                       <li key={i} className={`p-1 flex justify-between items-center ${log.points>0?'text-green-400':'text-red-400'}`}>
                         <span><span className="font-bold">{log.points>0?`+${log.points}`:log.points}</span>: {log.type}</span>
-                        <span className="text-base text-gray-500">({log.timestamp?.toDate().toLocaleDateString?.() || ''})</span>
+                        <span className="text-base text-gray-500">({safeDate(log.timestamp)})</span>
                       </li>
                     ))}
                   </ul>
@@ -867,7 +876,7 @@ const App = () => {
                     <ul className="text-lg">
                       {studentFeedbackLog.map((log,i)=>(
                         <li key={i} className="p-2 border-b border-slate-700 text-gray-300">
-                          ({log.timestamp?.toDate().toLocaleTimeString?.() || ''}): {log.status}
+                          ({safeTime(log.timestamp)}): {log.status}
                         </li>
                       ))}
                     </ul>
