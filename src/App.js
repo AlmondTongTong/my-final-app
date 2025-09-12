@@ -105,7 +105,7 @@ const TalentGraph = ({ talentsData, type, selectedCourse, getFirstName }) => {
    폼(입력 보존: localStorage)
    ========================= */
 const ContentForm = React.memo(({ formKey, type, onAddContent, isEnabled, placeholder }) => {
-  const STORAGE_KEY = 'draft:' + formKey + ':' + type; // 보수적: 템플릿 리터럴 대신 문자열 연결
+  const STORAGE_KEY = 'draft:' + formKey + ':' + type;
   const [text, setText] = useState(() => localStorage.getItem(STORAGE_KEY) || '');
 
   const onChange = (e) => {
@@ -192,11 +192,8 @@ const App = () => {
   const [isClassActive, setIsClassActive] = useState(false);
   const [talentsLog, setTalentsLog] = useState([]);
   const [studentSelectedDate, setStudentSelectedDate] = useState(()=>new Date().toISOString().slice(0,10));
-  const [dailyProgress, setDailyProgress] = useState({ question_comment: 0, reasoning: 0 });
   const [myTotalTalents, setMyTotalTalents] = useState(0);
   const [talentTransactions, setTalentTransactions] = useState([]);
-  const [studentFeedbackLog, setStudentFeedbackLog] = useState([]);
-  const [clickedButton, setClickedButton] = useState(null);
   const [adminSelectedDate, setAdminSelectedDate] = useState(()=>new Date().toISOString().slice(0,10));
   const [adminSelectedStudent, setAdminSelectedStudent] = useState('');
   const [adminStudentLog, setAdminStudentLog] = useState([]);
@@ -208,7 +205,6 @@ const App = () => {
   const [replies, setReplies] = useState({});
   const [showReplies, setShowReplies] = useState({});
   const [isAdminAnonymousMode, setIsAdminAnonymousMode] = useState(false);
-  const [verbalParticipationCount, setVerbalParticipationCount] = useState(0);
 
   const showMessage = useCallback((msg) => {
     setMessage(msg); setShowMessageBox(true);
@@ -344,7 +340,7 @@ const App = () => {
 
   useEffect(() => {
     if (!db || isAdmin || !nameInput || !isAuthenticated) {
-      setAllPostsLog([]); setMyTotalTalents(0); setTalentTransactions([]); setDailyProgress({question_comment:0, reasoning:0}); setStudentFeedbackLog([]);
+      setAllPostsLog([]); setMyTotalTalents(0); setTalentTransactions([]);
       return;
     }
     const transactionsQuery = query(
@@ -356,7 +352,6 @@ const App = () => {
       const today = new Date().toISOString().slice(0,10);
       const todays = snap.docs.map(d=>d.data()).filter(t => t.timestamp?.toDate().toISOString().slice(0,10)===today);
       setTalentTransactions(todays);
-      setVerbalParticipationCount(todays.filter(t=>t.type==='verbal_participation').length);
     });
 
     const talentDocRef = doc(db, `/artifacts/${appId}/public/data/talents`, nameInput);
@@ -372,23 +367,9 @@ const App = () => {
     const unsubAll = onSnapshot(allPostsQuery, snapshot => {
       const posts = snapshot.docs.map(d=>({id:d.id,...d.data()}));
       setAllPostsLog(posts);
-      const myPosts = posts.filter(p=>p.name===nameInput);
-      setDailyProgress({
-        question_comment: myPosts.filter(a=>a.type==='question_comment').length,
-        reasoning: myPosts.filter(a=>a.type==='reasoning').length
-      });
     });
 
-    const feedbackQuery = query(
-      collection(db, `/artifacts/${appId}/public/data/feedback`),
-      where("course","==",selectedCourse),
-      where("name","==",nameInput),
-      where("date","==",studentSelectedDate),
-      orderBy("createdAtClient","asc")
-    );
-    const unsubF = onSnapshot(feedbackQuery, snap => setStudentFeedbackLog(snap.docs.map(d=>d.data())));
-
-    return () => { unsubM(); unsubT(); unsubF(); unsubAll(); };
+    return () => { unsubM(); unsubT(); unsubAll(); };
   }, [db, selectedCourse, nameInput, studentSelectedDate, appId, isAdmin, isAuthenticated]);
 
   /* Poll */
@@ -407,7 +388,7 @@ const App = () => {
     return () => unsubscribe();
   }, [db, selectedCourse, isAuthenticated, nameInput, appId]);
 
-  /* 액션 */
+  /* 재사용 액션 */
   const modifyTalent = useCallback(async (studentName, amount, type) => {
     if (!db) return;
     const talentDocRef = doc(db, `/artifacts/${appId}/public/data/talents`, studentName);
@@ -439,20 +420,8 @@ const App = () => {
     } catch { showMessage("Submission failed. ❌"); }
   }, [db, nameInput, selectedCourse, appId, modifyTalent, showMessage]);
 
-  const handleFeedback = useCallback(async (status) => {
-    if (!db || !nameInput.trim()) return showMessage("Please select your name first.");
-    setClickedButton(status); setTimeout(()=>setClickedButton(null),1500);
-    try {
-      await addDoc(collection(db, `/artifacts/${appId}/public/data/feedback`), {
-        name: nameInput, status, course: selectedCourse, date: new Date().toISOString().slice(0,10),
-        createdAtClient: Date.now(), timestamp: serverTimestamp()
-      });
-      showMessage("Feedback submitted!");
-    } catch { showMessage("Failed to submit feedback."); }
-  }, [db, nameInput, selectedCourse, appId, showMessage]);
-
   const handleAdminLogin = (password) => {
-    if (password === ADMIN_PASSWORD) { setIsAdmin(true); showMessage("Admin Login successful! 🔑"); }
+    if (password === '0811') { setIsAdmin(true); showMessage("Admin Login successful! 🔑"); }
     else showMessage("Incorrect password. 🚫");
   };
 
@@ -462,13 +431,6 @@ const App = () => {
     try { await updateDoc(questionDocRef, { reply: replyText }); showMessage("Reply sent!"); }
     catch (e) { showMessage("Failed to send reply."); console.error(e); }
   }, [db, appId, showMessage]);
-
-  const handleStudentLike = useCallback(async (logId) => {
-    if(!db) return;
-    const questionDocRef = doc(db, `/artifacts/${appId}/public/data/questions`, logId);
-    try { await updateDoc(questionDocRef, { studentLiked: true }); }
-    catch (e) { console.error("Error (student like):", e) }
-  }, [db, appId]);
 
   const handleAdminLike = useCallback(async (logId, authorFullName) => {
     if(!db) return;
@@ -548,13 +510,7 @@ const App = () => {
     };
   }, []);
 
-  const handleVerbalParticipation = useCallback(() => {
-    if (!db || !nameInput) return;
-    modifyTalent(nameInput, 1, 'verbal_participation');
-  }, [db, nameInput, modifyTalent]);
-
   const isNameEntered = nameInput.trim().length > 0;
-  const isReadyToParticipate = isAuthenticated && isClassActive;
 
   const adminDailyProgress = useMemo(() => {
     const roster = COURSE_STUDENTS[selectedCourse] || [];
@@ -567,18 +523,6 @@ const App = () => {
     });
     return init;
   }, [questionsLog, selectedCourse]);
-
-  const [reasoningPosts, qcPosts] = useMemo(() => {
-    const reasoning = questionsLog.filter(p => p.type === 'reasoning');
-    const qc = questionsLog.filter(p => p.type === 'question_comment');
-    return [reasoning, qc];
-  }, [questionsLog]);
-
-  const [studentReasoningPosts, studentQcPosts] = useMemo(() => {
-    const reasoning = allPostsLog.filter(p => p.type === 'reasoning');
-    const qc = allPostsLog.filter(p => p.type === 'question_comment');
-    return [reasoning, qc];
-  }, [allPostsLog]);
 
   /* ============ UI 컴포넌트 (리스트 분리/메모) ============ */
   const ReplyForm = ({ log, onReply }) => {
@@ -606,7 +550,6 @@ const App = () => {
     );
   };
 
-  // ✅ onStudentAddReply 추가(학생 뷰에서만 사용)
   const PostList = React.memo(function PostList({
     posts, type, onAdminLike, onPenalty, onReply, onStudentAddReply,
     toggleReplies, showReplies, replies, listRef, anonymizeName, getFirstName
@@ -643,6 +586,10 @@ const App = () => {
   /* 메인 콘텐츠 */
   const MainContent = () => {
     const penalty = (studentName) => modifyTalent(studentName, -1, 'penalty');
+
+    // 파생 데이터(학생 뷰용)
+    const studentReasoningPosts = useMemo(() => allPostsLog.filter(p => p.type === 'reasoning'), [allPostsLog]);
+    const studentQcPosts = useMemo(() => allPostsLog.filter(p => p.type === 'question_comment'), [allPostsLog]);
 
     return (
       <div className="w-full max-w-4xl p-6 bg-slate-800 text-white rounded-xl shadow-lg box-shadow-custom">
@@ -812,8 +759,6 @@ const App = () => {
                     className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-2xl"/>
                 </div>
 
-                {!isClassActive && <div className="text-center p-3 bg-red-800 text-white rounded-lg mb-4 text-xl"><p>You can only submit new responses during class time.</p></div>}
-
                 <div className={`p-4 border border-slate-600 rounded-xl mb-6 ${!(isAuthenticated && isClassActive) ? 'opacity-50 pointer-events-none' : ''}`}>
                   <ContentForm formKey={`${selectedCourse}:${nameInput}:${studentSelectedDate}`} type="question_comment" onAddContent={handleAddContent} isEnabled={isAuthenticated && isClassActive} placeholder="Post 2 Questions/Comments..." />
                   <div className="my-4 border-t border-slate-700" />
@@ -849,7 +794,7 @@ const App = () => {
                           onAdminLike={()=>{}}
                           onPenalty={()=>{}}
                           onReply={()=>{}}
-                          onStudentAddReply={handleAddReply}   // ✅ 학생 답글 핸들러 전달
+                          onStudentAddReply={handleAddReply}
                           toggleReplies={toggleReplies}
                           showReplies={showReplies}
                           replies={replies}
@@ -867,7 +812,7 @@ const App = () => {
                           onAdminLike={()=>{}}
                           onPenalty={()=>{}}
                           onReply={()=>{}}
-                          onStudentAddReply={handleAddReply}   // ✅ 학생 답글 핸들러 전달
+                          onStudentAddReply={handleAddReply}
                           toggleReplies={toggleReplies}
                           showReplies={showReplies}
                           replies={replies}
@@ -877,15 +822,6 @@ const App = () => {
                         />
                       </div>
                     </div>
-
-                    <h4 className="font-semibold mt-4 text-2xl text-gray-300">🚦 My Understanding Checks</h4>
-                    <ul className="text-lg">
-                      {studentFeedbackLog.map((log,i)=>(
-                        <li key={i} className="p-2 border-b border-slate-700 text-gray-300">
-                          ({safeTime(log.timestamp)}): {log.status}
-                        </li>
-                      ))}
-                    </ul>
                   </div>
                 )}
 
