@@ -80,7 +80,7 @@ function usePreserveScroll(containerRef, deps) {
       if (!containerRef.current) return;
       containerRef.current.scrollTop = containerRef.current.scrollHeight - prevBottomOffset;
     });
-  }, deps);
+  }, [deps, containerRef]); // FIX: Added missing dependency 'containerRef'
 }
 
 /** --------------------------
@@ -103,7 +103,7 @@ const TalentGraph = ({ talentsData, type, selectedCourse, getFirstName }) => {
       return highest.id === lowest.id ? [highest] : [highest, lowest];
     }
     return [];
-  }, [talentsData, selectedCourse, type, getFirstName]);
+  }, [talentsData, selectedCourse, type]); // FIX: Removed unnecessary dependency 'getFirstName'
 
   if (displayData.length === 0) return <p className="text-gray-400 text-lg">No talent data yet.</p>;
   const maxScore = displayData.length > 0 ? displayData[0].totalTalents : 0;
@@ -575,7 +575,8 @@ const App = () => {
   const [studentSelectedDate, setStudentSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [dailyProgress, setDailyProgress] = useState({ question_comment: 0, reasoning: 0 });
   const [myTotalTalents, setMyTotalTalents] = useState(0);
-  const [talentTransactions, setTalentTransactions] = useState([]);
+  // FIX: Removed unused 'talentTransactions' state
+  // const [talentTransactions, setTalentTransactions] = useState([]); 
   const [studentFeedbackLog, setStudentFeedbackLog] = useState([]);
   const [clickedButton, setClickedButton] = useState(null);
   const [adminSelectedDate, setAdminSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -610,15 +611,15 @@ const App = () => {
 
   useEffect(() => {
     // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-    const firebaseConfig = {
-        apiKey: "AIzaSyCgl2EZSBv5eerKjcFsCGojT68ZwnfGL-U",
-        authDomain: "ahnstoppable-learning.firebaseapp.com",
-        projectId: "ahnstoppable-learning",
-        storageBucket: "ahnstoppable-learning.appspot.com",
-        messagingSenderId: "365013467715",
-        appId: "1:365013467715:web:113e63c822fae43123caf6",
-        measurementId: "G-MT9ETH31MY"
-    };
+const firebaseConfig = {
+  apiKey: "AIzaSyCgl2EZSBv5eerKjcFsCGojT68ZwnfGL-U",
+  authDomain: "ahnstoppable-learning.firebaseapp.com",
+  projectId: "ahnstoppable-learning",
+  storageBucket: "ahnstoppable-learning.firebasestorage.app",
+  messagingSenderId: "365013467715",
+  appId: "1:365013467715:web:113e63c822fae43123caf6",
+  measurementId: "G-MT9ETH31MY"
+};
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     setDb(getFirestore(app));
@@ -739,7 +740,7 @@ const App = () => {
 
   useEffect(() => {
     if (!db || isAdmin || !nameInput || !isAuthenticated) {
-      setAllPostsLog([]); setMyTotalTalents(0); setTalentTransactions([]);
+      setAllPostsLog([]); setMyTotalTalents(0);
       setDailyProgress({ question_comment: 0, reasoning: 0 }); setStudentFeedbackLog([]);
       return;
     }
@@ -753,7 +754,6 @@ const App = () => {
       const today = new Date().toISOString().slice(0, 10);
       const todaysTransactions = snap.docs.map(d => d.data())
         .filter(t => t.timestamp?.toDate().toISOString().slice(0, 10) === today);
-      setTalentTransactions(todaysTransactions);
       setVerbalParticipationCount(todaysTransactions.filter(t => t.type === 'verbal_participation').length);
     });
 
