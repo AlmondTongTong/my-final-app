@@ -54,7 +54,6 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // 오류 수정을 위해 새로 추가된 부분: 입력창 컴포넌트
-// 이 컴포넌트는 입력 상태를 독립적으로 관리하여, 글자 입력 시 전체 화면이 새로고침되는 것을 방지합니다.
 const PostInput = ({ title, onSubmit, placeholder }) => {
   const [text, setText] = useState('');
 
@@ -91,10 +90,6 @@ const App = () => {
   const [polls, setPolls] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [dalants, setDalants] = useState({});
-
-  // 오류 수정을 위해 아래 두 줄을 삭제했습니다.
-  // const [newPost, setNewPost] = useState('');
-  // const [newReasoning, setNewReasoning] = useState('');
 
   const messagesEndRef = React.useRef(null);
 
@@ -138,7 +133,6 @@ const App = () => {
 
   const handleAdminLogin = () => {
     const password = prompt("Enter admin password:");
-    // 중요: 이 비밀번호는 원래 코드에 있던 그대로입니다.
     if (password === "adv375") { 
       setIsAdmin(true);
       setStudentName("Admin");
@@ -157,7 +151,6 @@ const App = () => {
     setStudentName(name);
   };
   
-  // 오류 수정을 위해 함수 인자(text)를 받도록 수정했습니다.
   const handlePostSubmit = async (text) => {
     if (!text || !auth.currentUser) return;
     await addDoc(collection(db, 'courses', selectedCourse, 'messages'), {
@@ -168,7 +161,6 @@ const App = () => {
     });
   };
 
-  // 오류 수정을 위해 함수 인자(text)를 받도록 수정했습니다.
   const handleReasoningSubmit = async (text) => {
     if (!text || !auth.currentUser) return;
     await addDoc(collection(db, 'courses', selectedCourse, 'messages'), {
@@ -271,7 +263,6 @@ const App = () => {
           ))}
         </div>
 
-        {/* 오류 수정을 위해 기존 입력창을 새로 만든 PostInput 컴포넌트로 교체했습니다. */}
         <PostInput
           title="Questions and Comments"
           onSubmit={handlePostSubmit}
@@ -400,7 +391,8 @@ const App = () => {
       {selectedCourse && studentName && <MainContent />}
 
       <footer className="w-full text-center mt-4">
-        <p className="text-gray-600">&copy; {newgetFullYear()} Ahn's App. All rights reserved.</p>
+        {/* 여기가 오타가 있었던 부분입니다. new Date().getFullYear()로 수정했습니다. */}
+        <p className="text-gray-600">&copy; {new Date().getFullYear()} Ahn's App. All rights reserved.</p>
       </footer>
     </div>
   );
