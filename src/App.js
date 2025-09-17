@@ -78,11 +78,10 @@ function usePreserveScroll(containerRef, deps) {
     if (!el) return;
     const prevBottomOffset = el.scrollHeight - el.scrollTop;
     requestAnimationFrame(() => {
-      if (!containerRef.current) return;
+      if (!containerRef.current) return; // 오타를 수정했습니다.
       containerRef.current.scrollTop = containerRef.current.scrollHeight - prevBottomOffset;
     });
-    // deps: 리스트 길이 등
-  }, deps); // eslint-disable-line react-hooks/exhaustive-deps
+  }, deps);
 }
 
 /** --------------------------
