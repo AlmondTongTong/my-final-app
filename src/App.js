@@ -1,17 +1,14 @@
-/* global __app_id */
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import {
   getFirestore,
   collection,
   query,
-  where,
   addDoc,
   onSnapshot,
   serverTimestamp,
   doc,
-  setDoc,
   getDoc,
   updateDoc,
   orderBy
@@ -68,7 +65,6 @@ function usePreserveScroll(containerRef, deps) {
   }, [deps, containerRef]);
 }
 
-// 댓글/질문 입력창을 위한 새로운 컴포넌트
 const PostInput = ({ title, onSubmit, placeholder }) => {
   const [text, setText] = useState('');
 
@@ -253,6 +249,7 @@ const App = () => {
       setActiveReplyId(null);
     };
     
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     const sortedMessages = useMemo(() => {
         return [...messages].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
     }, [messages]);
