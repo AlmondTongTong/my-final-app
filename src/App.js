@@ -73,17 +73,17 @@ const isWithinClassTime = (courseName) => {
  *  스크롤 보존 훅 (리스트 길이 변화 등에서 점프 방지)
  *  -------------------------- */
 function usePreserveScroll(containerRef, deps) {
-  React.useLayoutEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const prevBottomOffset = el.scrollHeight - el.scrollTop;
-    requestAnimationFrame(() => {
-      if (!containerRef.current) return; // 오타를 수정했습니다.
-      containerRef.current.scrollTop = containerRef.current.scrollHeight - prevBottomOffset;
-    });
-  }, deps);
-}
-
+    React.useLayoutEffect(() => {
+      const el = containerRef.current;
+      if (!el) return;
+      const prevBottomOffset = el.scrollHeight - el.scrollTop;
+      requestAnimationFrame(() => {
+        if (!containerRef.current) return;
+        containerRef.current.scrollTop =
+          containerRef.current.scrollHeight - prevBottomOffset;
+      });
+    }, [deps, containerRef]);
+  }
 /** --------------------------
  *  그래프
  *  -------------------------- */
