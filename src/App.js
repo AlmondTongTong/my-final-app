@@ -40,7 +40,7 @@ const COURSE_STUDENTS = {
 };
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY", // 이 부분은 원래 코드의 설정을 그대로 유지합니다.
+  apiKey: "YOUR_API_KEY", // 이 부분은 원래 사용하시던 키로 유지됩니다.
   authDomain: "YOUR_AUTH_DOMAIN",
   projectId: "ahn-app-final-project",
   storageBucket: "YOUR_STORAGE_BUCKET",
@@ -52,14 +52,14 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// 오류 수정을 위해 새로 추가된 부분: 입력창 컴포넌트
+// 스크롤 오류를 해결하기 위한 독립적인 입력창 컴포넌트
 const PostInput = ({ title, onSubmit, placeholder }) => {
   const [text, setText] = useState('');
 
   const handleSubmit = () => {
     if (text.trim()) {
       onSubmit(text.trim());
-      setText(''); // 제출 후 입력창 비우기
+      setText('');
     }
   };
 
