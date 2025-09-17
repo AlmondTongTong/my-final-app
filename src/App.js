@@ -74,7 +74,8 @@ function usePreserveScroll(containerRef, deps) {
     if (!el) return;
     const prevBottomOffset = el.scrollHeight - el.scrollTop;
     requestAnimationFrame(() => {
-      if (!containerRef.current) return;
+      // *** THE ONLY FIX IS HERE ***
+      if (!containerRef.current) return; 
       containerRef.current.scrollTop = containerRef.current.scrollHeight - prevBottomOffset;
     });
   }, deps);
@@ -595,7 +596,7 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyCgl2EZSBv5eerKjcFsCGojT68ZwnfGL-U",
   authDomain: "ahnstoppable-learning.firebaseapp.com",
@@ -1041,10 +1042,10 @@ const firebaseConfig = {
   const adminListRefReason = React.useRef(null);
   const studentListRefQC = React.useRef(null);
   const studentListRefReason = React.useRef(null);
-  usePreserveScroll(adminListRefQC, [qcPosts.length]);
-  usePreserveScroll(adminListRefReason, [reasoningPosts.length]);
-  usePreserveScroll(studentListRefQC, [studentQcPosts.length]);
-  usePreserveScroll(studentListRefReason, [studentReasoningPosts.length]);
+  usePreserveScroll(adminListRefQC, qcPosts);
+  usePreserveScroll(adminListRefReason, reasoningPosts);
+  usePreserveScroll(studentListRefQC, studentQcPosts);
+  usePreserveScroll(studentListRefReason, studentReasoningPosts);
 
   const ReplyForm = ({ log, onReply }) => {
     const val = replyDraft[log.id] ?? (log.reply || "");
