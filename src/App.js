@@ -1,4 +1,3 @@
-/* global __app_id */
 import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
@@ -391,7 +390,6 @@ const App = () => {
       {selectedCourse && studentName && <MainContent />}
 
       <footer className="w-full text-center mt-4">
-        {/* 여기가 오타가 있었던 부분입니다. new Date().getFullYear()로 수정했습니다. */}
         <p className="text-gray-600">&copy; {new Date().getFullYear()} Ahn's App. All rights reserved.</p>
       </footer>
     </div>
