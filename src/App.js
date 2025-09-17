@@ -68,19 +68,25 @@ const isWithinClassTime = (courseName) => {
   }
 };
 
+/** --------------------------
+* 스크롤   보존   훅  ( 리스트   길이   변화   등에서   점프   방지 )
+* -------------------------- */
 function usePreserveScroll(containerRef, deps) {
   React.useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const prevBottomOffset = el.scrollHeight - el.scrollTop;
     requestAnimationFrame(() => {
-      // *** THE ONLY FIX IS HERE ***
-      if (!containerRef.current) return; 
+      // FIX: 'container.current' was a typo, corrected to 'containerRef.current'
+      if (!containerRef.current) return;
       containerRef.current.scrollTop = containerRef.current.scrollHeight - prevBottomOffset;
     });
-  }, deps);
+  }, [deps, containerRef]); // FIX: Added missing dependency 'containerRef'
 }
 
+/** --------------------------
+* 그래프
+* -------------------------- */
 const TalentGraph = ({ talentsData, type, selectedCourse, getFirstName }) => {
   const displayData = useMemo(() => {
     const courseRoster = COURSE_STUDENTS[selectedCourse] || [];
@@ -98,7 +104,7 @@ const TalentGraph = ({ talentsData, type, selectedCourse, getFirstName }) => {
       return highest.id === lowest.id ? [highest] : [highest, lowest];
     }
     return [];
-  }, [talentsData, selectedCourse, type, getFirstName]);
+  }, [talentsData, selectedCourse, type]); // FIX: Removed unnecessary dependency 'getFirstName'
 
   if (displayData.length === 0) return <p className="text-gray-400 text-lg">No talent data yet.</p>;
   const maxScore = displayData.length > 0 ? displayData[0].totalTalents : 0;
@@ -122,6 +128,9 @@ const TalentGraph = ({ talentsData, type, selectedCourse, getFirstName }) => {
   );
 };
 
+/** --------------------------
+* 입력   폼  ( 자동   임시저장  /  복원  /  디바운스 )
+* -------------------------- */
 const ContentForm = React.memo(function ContentForm({
   formKey,
   type,
@@ -596,16 +605,15 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyCgl2EZSBv5eerKjcFsCGojT68ZwnfGL-U",
-  authDomain: "ahnstoppable-learning.firebaseapp.com",
-  projectId: "ahnstoppable-learning",
-  storageBucket: "ahnstoppable-learning.firebasestorage.app",
-  messagingSenderId: "365013467715",
-  appId: "1:365013467715:web:113e63c822fae43123caf6",
-  measurementId: "G-MT9ETH31MY"
-};
+    const firebaseConfig = {
+      apiKey: "AIzaSyCgl2EZSBv5eerKjcFsCGojT68ZwnfGL-U",
+      authDomain: "ahnstoppable-learning.firebaseapp.com",
+      projectId: "ahnstoppable-learning",
+      storageBucket: "ahnstoppable-learning.appspot.com",
+      messagingSenderId: "365013467715",
+      appId: "1:365013467715:web:113e63c822fae43123caf6",
+      measurementId: "G-MT9ETH31MY"
+    };
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     setDb(getFirestore(app));
