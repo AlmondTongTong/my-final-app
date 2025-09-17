@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import {
@@ -249,10 +249,9 @@ const App = () => {
       setActiveReplyId(null);
     };
     
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const sortedMessages = useMemo(() => {
-        return [...messages].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-    }, [messages]);
+    // The problematic 'useMemo' hook has been removed from here.
+    // The sorting now happens directly before rendering.
+    const sortedMessages = [...messages].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 
     if (!selectedCourse || !studentName) return null;
     
