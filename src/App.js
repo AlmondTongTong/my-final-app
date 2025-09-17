@@ -1,4 +1,5 @@
 /* global __app_id */
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
@@ -69,24 +70,23 @@ const isWithinClassTime = (courseName) => {
 };
 
 /** --------------------------
-* 스크롤   보존   훅  ( 리스트   길이   변화   등에서   점프   방지 )
-* -------------------------- */
+ *  스크롤 보존 훅 (리스트 길이 변화 등에서 점프 방지)
+ *  -------------------------- */
 function usePreserveScroll(containerRef, deps) {
   React.useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const prevBottomOffset = el.scrollHeight - el.scrollTop;
     requestAnimationFrame(() => {
-      // FIX: 'container.current' was a typo, corrected to 'containerRef.current'
-      if (!containerRef.current) return;
+      if (!containerRef.current) return; // 오타를 수정했습니다.
       containerRef.current.scrollTop = containerRef.current.scrollHeight - prevBottomOffset;
     });
-  }, [deps, containerRef]); // FIX: Added missing dependency 'containerRef'
+  }, deps);
 }
 
 /** --------------------------
-* 그래프
-* -------------------------- */
+ *  그래프
+ *  -------------------------- */
 const TalentGraph = ({ talentsData, type, selectedCourse, getFirstName }) => {
   const displayData = useMemo(() => {
     const courseRoster = COURSE_STUDENTS[selectedCourse] || [];
@@ -104,10 +104,11 @@ const TalentGraph = ({ talentsData, type, selectedCourse, getFirstName }) => {
       return highest.id === lowest.id ? [highest] : [highest, lowest];
     }
     return [];
-  }, [talentsData, selectedCourse, type]); // FIX: Removed unnecessary dependency 'getFirstName'
+  }, [talentsData, selectedCourse, type]);
 
   if (displayData.length === 0) return <p className="text-gray-400 text-lg">No talent data yet.</p>;
   const maxScore = displayData.length > 0 ? displayData[0].totalTalents : 0;
+
   return (
     <div className="space-y-4">
       {displayData.map(talent => (
@@ -129,10 +130,10 @@ const TalentGraph = ({ talentsData, type, selectedCourse, getFirstName }) => {
 };
 
 /** --------------------------
-* 입력   폼  ( 자동   임시저장  /  복원  /  디바운스 )
-* -------------------------- */
+ *  입력 폼 (자동 임시저장 / 복원 / 디바운스)
+ *  -------------------------- */
 const ContentForm = React.memo(function ContentForm({
-  formKey,
+  formKey, // `${selectedCourse}:${nameInput}:${studentSelectedDate}`
   type,
   onAddContent,
   isEnabled,
@@ -171,6 +172,7 @@ const ContentForm = React.memo(function ContentForm({
       try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
     }
   };
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
       <textarea
@@ -194,7 +196,6 @@ const ContentForm = React.memo(function ContentForm({
 const AdminLoginForm = ({ onAdminLogin }) => {
   const [password, setPassword] = useState('');
   const handleLogin = () => { onAdminLogin(password); };
-
   return (
     <div className="flex space-x-2">
       <input
@@ -212,12 +213,9 @@ const AdminLoginForm = ({ onAdminLogin }) => {
 const PinAuth = React.memo(({ nameInput, isPinRegistered, onLogin, onRegister, getFirstName }) => {
   const [pinInput, setPinInput] = useState('');
   const [pinConfirmationInput, setPinConfirmationInput] = useState('');
-
   const handleLoginClick = () => { onLogin(pinInput); setPinInput(''); };
   const handleRegisterClick = () => { onRegister(pinInput, pinConfirmationInput); setPinInput(''); setPinConfirmationInput(''); };
-
   if (!nameInput) return null;
-
   return isPinRegistered ? (
     <div className="my-4 p-4 bg-slate-700 rounded-lg animate-fade-in">
       <p className="text-center text-white mb-2 font-semibold text-2xl">Enter your 4-digit PIN, {getFirstName(nameInput)}.</p>
@@ -264,298 +262,9 @@ const PinAuth = React.memo(({ nameInput, isPinRegistered, onLogin, onRegister, g
   );
 });
 
-const StudentPostItem = ({
-  post, nameInput, getFirstName, handleStudentLike,
-  toggleReplies, showReplies, replies, StudentReplyForm, handleAddReply
-}) => (
-  <div className={`p-3 rounded-lg ${post.name === nameInput ? 'bg-blue-900' : 'bg-slate-600'}`}>
-    <p className="text-xl">
-      <span className="font-bold">{post.name === nameInput ? "Me" : getFirstName(post.name)}: </span>{post.text}
-    </p>
-    {post.reply && <p className="mt-1 p-2 bg-green-900 rounded-lg text-lg">↪ <span className="font-semibold">Ahn</span>: {post.reply}</p>}
-    <div className="flex items-center mt-2 space-x-4">
-      {post.name !== nameInput && (
-        post.studentLiked ? <span className="text-yellow-400 font-bold text-lg">✓ Liked</span> : <button onClick={() => handleStudentLike(post.id)} className="text-2xl">👍</button>
-      )}
-      <button onClick={() => toggleReplies(post.id)} className="text-lg text-gray-300 hover:underline">
-        {showReplies[post.id] ? 'Hide' : 'Show'} Replies ({replies[post.id]?.length || 0})
-      </button>
-    </div>
-    {showReplies[post.id] && (
-      <div className="mt-2 pl-4 border-l-2 border-slate-500">
-        {replies[post.id]?.map(r => (
-          <p key={r.id} className="text-lg mb-1">{r.author}: {r.text}</p>
-        ))}
-        <StudentReplyForm postId={post.id} onAddReply={handleAddReply} />
-      </div>
-    )}
-  </div>
-);
-
-const StudentView = ({
-  nameInput, selectedCourse, setSelectedCourse, handleNameChange, isNameEntered,
-  isAuthenticated, isPinRegistered, handlePinLogin, handlePinRegister, getFirstName,
-  isReadyToParticipate, dailyProgress, myTotalTalents, verbalParticipationCount,
-  handleVerbalParticipation, studentFeedbackLog, handleFeedback, clickedButton,
-  studentSelectedDate, setStudentSelectedDate, studentReasoningPosts, studentQcPosts,
-  studentListRefQC, studentListRefReason, handleStudentLike, toggleReplies,
-  showReplies, replies, StudentReplyForm, handleAddReply, activePoll,
-  handlePollVote, userPollVote, talentsLog, handleAddContent, onAdminLogin,
-  isClassActive
-}) => {
-
-  const talentsDataForGraph = useMemo(() =>
-    talentsLog.map(t => ({ id: t.id, totalTalents: t.totalTalents, name: t.name })),
-    [talentsLog]);
-
-  return (
-    <>
-      <h1 className="text-5xl font-bold text-center mb-4"><span className="text-green-500">''Ahn''</span>stoppable Learning</h1>
-      <div className="flex flex-wrap justify-center gap-2 mb-4">
-        {COURSES.map((course) => (
-          <button
-            key={course}
-            onClick={() => { setSelectedCourse(course); handleNameChange(''); }}
-            className={`p-3 text-lg font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}
-          >
-            {course}
-          </button>
-        ))}
-        <AdminLoginForm onAdminLogin={onAdminLogin} />
-      </div>
-
-      {!isNameEntered && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          {COURSE_STUDENTS[selectedCourse].map((name, index) => (
-            <button key={index} onClick={() => handleNameChange(name)} className="p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-lg">
-              {getFirstName(name)}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {isNameEntered && !isAuthenticated && (
-        <PinAuth
-          nameInput={nameInput}
-          isPinRegistered={isPinRegistered}
-          onLogin={handlePinLogin}
-          onRegister={handlePinRegister}
-          getFirstName={getFirstName}
-        />
-      )}
-
-      {isAuthenticated && (
-        <div className="animate-fade-in">
-          <div className="text-center mb-6">
-            <button onClick={() => handleNameChange('')} className="p-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 text-lg">Change Student</button>
-          </div>
-          {!isClassActive && (
-            <div className="text-center p-4 bg-red-800 rounded-lg mb-4">
-              <p className="text-2xl font-bold">Class is not in session. Come back later!</p>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1 space-y-6">
-              <div className="p-4 bg-slate-700 rounded-xl">
-                <h2 className="text-3xl font-semibold mb-3">My Status</h2>
-                <div className="flex justify-around items-center text-center p-3 bg-yellow-400 text-black rounded-lg">
-                  <img src="/talent-coin.png" alt="Talent coin" className="w-10 h-10" />
-                  <p className="font-bold text-3xl">{myTotalTalents}</p>
-                </div>
-                <div className="mt-3 text-center text-xl">
-                  <p>Question/Comment: {dailyProgress.question_comment}</p>
-                  <p>Reasoning: {dailyProgress.reasoning}</p>
-                  <p>Verbal Participation: {verbalParticipationCount}</p>
-                </div>
-                {isReadyToParticipate && <button onClick={handleVerbalParticipation} className="w-full mt-3 p-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-xl">Verbal Participation</button>}
-              </div>
-
-              <div className="p-4 bg-slate-700 rounded-xl">
-                <h2 className="text-3xl font-semibold mb-3">Today's Feedback</h2>
-                <div className="space-y-2">
-                  <button
-                    onClick={() => handleFeedback('👍 All good!')}
-                    disabled={!isReadyToParticipate}
-                    className={`w-full p-3 text-2xl rounded-lg ${clickedButton === '👍 All good!' ? 'bg-green-700' : 'bg-green-500'} hover:bg-green-600 disabled:opacity-50 transition-colors`}
-                  >👍 All good!</button>
-                  <button
-                    onClick={() => handleFeedback('🤔 A bit confused')}
-                    disabled={!isReadyToParticipate}
-                    className={`w-full p-3 text-2xl rounded-lg ${clickedButton === '🤔 A bit confused' ? 'bg-yellow-700' : 'bg-yellow-500'} hover:bg-yellow-600 disabled:opacity-50 transition-colors`}
-                  >🤔 A bit confused</button>
-                  <button
-                    onClick={() => handleFeedback('👎 Totally lost')}
-                    disabled={!isReadyToParticipate}
-                    className={`w-full p-3 text-2xl rounded-lg ${clickedButton === '👎 Totally lost' ? 'bg-red-700' : 'bg-red-500'} hover:bg-red-600 disabled:opacity-50 transition-colors`}
-                  >👎 Totally lost</button>
-                </div>
-                <div className="mt-4">
-                  {studentFeedbackLog.map((fb, i) => <p key={i} className="text-lg">{fb.status}</p>)}
-                </div>
-              </div>
-
-              {activePoll && (
-                <div className="p-4 bg-slate-700 rounded-xl">
-                  <h2 className="text-3xl font-semibold mb-3">Live Poll</h2>
-                  <p className="text-xl mb-3">{activePoll.question}</p>
-                  {userPollVote !== null ? (
-                    <p className="text-center text-2xl p-3 bg-green-800 rounded-lg">You voted for: "{activePoll.options[userPollVote]}"</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {activePoll.options.map((option, index) => (
-                        <button
-                          key={index}
-                          onClick={() => handlePollVote(activePoll.id, index)}
-                          className="w-full p-3 text-xl bg-blue-600 hover:bg-blue-700 rounded-lg"
-                        >{option}</button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="p-4 bg-slate-700 rounded-xl">
-                <h2 className="text-3xl font-semibold mb-3">Talent Ranking</h2>
-                <TalentGraph talentsData={talentsDataForGraph} type="student" selectedCourse={selectedCourse} getFirstName={getFirstName} />
-              </div>
-
-            </div>
-
-            <div className="lg:col-span-2 space-y-6">
-              <div className="p-4 bg-slate-700 rounded-xl">
-                <h2 className="text-3xl font-semibold mb-3">Add Content</h2>
-                <div className="space-y-4">
-                  <ContentForm
-                    formKey={`${selectedCourse}:${nameInput}:${studentSelectedDate}`}
-                    type="question_comment"
-                    onAddContent={handleAddContent}
-                    isEnabled={isReadyToParticipate}
-                    placeholder="Questions or comments?"
-                  />
-                  <ContentForm
-                    formKey={`${selectedCourse}:${nameInput}:${studentSelectedDate}`}
-                    type="reasoning"
-                    onAddContent={handleAddContent}
-                    isEnabled={isReadyToParticipate}
-                    placeholder="Share your reasoning"
-                  />
-                </div>
-              </div>
-
-              <div className="p-4 bg-slate-700 rounded-xl">
-                <div className="flex justify-between items-center mb-3">
-                  <h2 className="text-3xl font-semibold">Today's Posts</h2>
-                  <input
-                    type="date"
-                    value={studentSelectedDate}
-                    onChange={(e) => setStudentSelectedDate(e.target.value)}
-                    className="p-2 border bg-slate-600 border-slate-500 rounded-lg text-lg"
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <h3 className="text-2xl font-medium mb-2">Reasoning</h3>
-                    <div ref={studentListRefReason} className="space-y-2 overflow-y-auto max-h-80 pr-2">
-                      {studentReasoningPosts.map(p => <StudentPostItem key={p.id} post={p} nameInput={nameInput} getFirstName={getFirstName} handleStudentLike={handleStudentLike} toggleReplies={toggleReplies} showReplies={showReplies} replies={replies} StudentReplyForm={StudentReplyForm} handleAddReply={handleAddReply} />)}
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-medium mb-2">Q & C</h3>
-                    <div ref={studentListRefQC} className="space-y-2 overflow-y-auto max-h-80 pr-2">
-                      {studentQcPosts.map(p => <StudentPostItem key={p.id} post={p} nameInput={nameInput} getFirstName={getFirstName} handleStudentLike={handleStudentLike} toggleReplies={toggleReplies} showReplies={showReplies} replies={replies} StudentReplyForm={StudentReplyForm} handleAddReply={handleAddReply} />)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-};
-
-const AdminLogItem = ({ log, onReply, onLike, onPenalty, isAdminAnonymousMode, ReplyFormComponent, getFirstName }) => (
-  <div className="p-3 bg-slate-600 rounded-lg">
-    <div className="flex justify-between items-start">
-      <div className="flex-1 mr-2 text-xl">
-        <span className="font-bold">{isAdminAnonymousMode ? "Anonymous" : getFirstName(log.name)}: </span>
-        {log.text}
-      </div>
-      <div className="flex items-center space-x-2 flex-shrink-0">
-        {log.adminLiked ? <span className="text-green-500 font-bold text-lg">✓ Liked</span> : <button onClick={() => onLike(log.id, log.name)} className="text-3xl">👍</button>}
-        <button onClick={() => onPenalty(log.name, -1, 'penalty')} className="px-3 py-1 bg-red-600 text-white text-md font-bold rounded hover:bg-red-700">-1</button>
-      </div>
-    </div>
-    <ReplyFormComponent log={log} onReply={onReply} />
-  </div>
-);
-
-const CreatePollForm = ({ onCreatePoll, onDeactivatePoll, activePoll }) => {
-  const [question, setQuestion] = useState('');
-  const [options, setOptions] = useState(['', '']);
-
-  const handleOptionChange = (index, value) => {
-    const newOptions = [...options];
-    newOptions[index] = value;
-    setOptions(newOptions);
-  };
-
-  const addOption = () => setOptions([...options, '']);
-  const removeOption = (index) => setOptions(options.filter((_, i) => i !== index));
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (question.trim() && options.every(o => o.trim())) {
-      onCreatePoll(question, options.map(o => o.trim()));
-      setQuestion('');
-      setOptions(['', '']);
-    }
-  };
-
-  return (
-    <div className="my-6 p-4 border border-slate-600 rounded-xl">
-      <h2 className="text-3xl font-semibold mb-4 text-center">Poll Management</h2>
-      {activePoll ? (
-        <div className="text-center">
-          <p className="text-xl mb-2">Current active poll:</p>
-          <p className="font-bold text-2xl mb-4">{activePoll.question}</p>
-          <button onClick={() => onDeactivatePoll(activePoll.id)} className="p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 text-xl">Close Current Poll</button>
-        </div>
-      ) : (
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <input
-            type="text"
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            placeholder="Poll Question"
-            className="w-full p-3 border bg-slate-700 border-slate-500 rounded-lg text-2xl"
-            required
-          />
-          {options.map((option, index) => (
-            <div key={index} className="flex items-center space-x-2">
-              <input
-                type="text"
-                value={option}
-                onChange={(e) => handleOptionChange(index, e.target.value)}
-                placeholder={`Option ${index + 1}`}
-                className="flex-1 p-3 border bg-slate-700 border-slate-500 rounded-lg text-2xl"
-                required
-              />
-              {options.length > 2 && <button type="button" onClick={() => removeOption(index)} className="p-2 bg-red-600 text-white rounded-full text-lg">X</button>}
-            </div>
-          ))}
-          <div className="flex justify-between">
-            <button type="button" onClick={addOption} className="p-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 text-lg">Add Option</button>
-            <button type="submit" className="p-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold text-xl">Create Poll</button>
-          </div>
-        </form>
-      )}
-    </div>
-  );
-};
-
+/** --------------------------
+ *  메인 App
+ *  -------------------------- */
 const App = () => {
   const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
   const [db, setDb] = useState(null);
@@ -572,7 +281,7 @@ const App = () => {
   const [studentSelectedDate, setStudentSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [dailyProgress, setDailyProgress] = useState({ question_comment: 0, reasoning: 0 });
   const [myTotalTalents, setMyTotalTalents] = useState(0);
-  const [verbalParticipationCount, setVerbalParticipationCount] = useState(0);
+  const [talentTransactions, setTalentTransactions] = useState([]);
   const [studentFeedbackLog, setStudentFeedbackLog] = useState([]);
   const [clickedButton, setClickedButton] = useState(null);
   const [adminSelectedDate, setAdminSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -586,8 +295,13 @@ const App = () => {
   const [replies, setReplies] = useState({});
   const [showReplies, setShowReplies] = useState({});
   const [isAdminAnonymousMode, setIsAdminAnonymousMode] = useState(false);
-  const [replyDraft, setReplyDraft] = useState({});
-  const replyUnsubs = React.useRef({});
+  const [verbalParticipationCount, setVerbalParticipationCount] = useState(0);
+
+  // 관리자 ReplyForm 드래프트 (리렌더·재정렬에도 유지)
+  const [replyDraft, setReplyDraft] = useState({}); // { [postId]: "text" }
+
+  // replies 구독 해제용
+  const replyUnsubs = React.useRef({}); // { [postId]: Unsubscribe[] }
 
   const showMessage = useCallback((msg) => {
     setMessage(msg);
@@ -608,11 +322,7 @@ const App = () => {
     const firebaseConfig = {
       apiKey: "AIzaSyCgl2EZSBv5eerKjcFsCGojT68ZwnfGL-U",
       authDomain: "ahnstoppable-learning.firebaseapp.com",
-      projectId: "ahnstoppable-learning",
-      storageBucket: "ahnstoppable-learning.appspot.com",
-      messagingSenderId: "365013467715",
-      appId: "1:365013467715:web:113e63c822fae43123caf6",
-      measurementId: "G-MT9ETH31MY"
+      projectId: "ahnstoppable-learning"
     };
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -684,6 +394,7 @@ const App = () => {
     return () => unsub();
   }, [db, selectedCourse, appId]);
 
+  // 관리자: 당일 로그 실시간 (증분 머지 + 정렬 유지)
   useEffect(() => {
     if (!db || !isAdmin) return;
     setQuestionsLog([]);
@@ -715,9 +426,11 @@ const App = () => {
     const unsubF = onSnapshot(fbQuery, (snap) =>
       setFeedbackLog(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     );
+
     return () => { unsubQ(); unsubF(); };
   }, [db, selectedCourse, adminSelectedDate, appId, isAdmin]);
 
+  // 관리자: 특정 학생 전체 로그
   useEffect(() => {
     if (!db || !isAdmin || !adminSelectedStudent) { setAdminStudentLog([]); return; }
     const logQuery = query(
@@ -732,13 +445,13 @@ const App = () => {
     return () => unsub();
   }, [db, selectedCourse, adminSelectedStudent, appId, isAdmin]);
 
+  // 학생 뷰: 내 재화/진행/피드백/전체 게시물 (전체 게시물은 증분 머지로 변경)
   useEffect(() => {
     if (!db || isAdmin || !nameInput || !isAuthenticated) {
-      setAllPostsLog([]); setMyTotalTalents(0);
+      setAllPostsLog([]); setMyTotalTalents(0); setTalentTransactions([]);
       setDailyProgress({ question_comment: 0, reasoning: 0 }); setStudentFeedbackLog([]);
       return;
     }
-
     const transactionsQuery = query(
       collection(db, `/artifacts/${appId}/public/data/talentTransactions`),
       where("name", "==", nameInput),
@@ -748,6 +461,7 @@ const App = () => {
       const today = new Date().toISOString().slice(0, 10);
       const todaysTransactions = snap.docs.map(d => d.data())
         .filter(t => t.timestamp?.toDate().toISOString().slice(0, 10) === today);
+      setTalentTransactions(todaysTransactions);
       setVerbalParticipationCount(todaysTransactions.filter(t => t.type === 'verbal_participation').length);
     });
 
@@ -791,6 +505,7 @@ const App = () => {
     return () => { unsubM(); unsubT(); unsubF(); unsubAll(); };
   }, [db, selectedCourse, nameInput, studentSelectedDate, appId, isAdmin, isAuthenticated]);
 
+  // Poll
   useEffect(() => {
     if (!db || !isAuthenticated) { setActivePoll(null); return; }
     const pollQuery = query(
@@ -815,6 +530,7 @@ const App = () => {
     return () => unsubscribe();
   }, [db, selectedCourse, isAuthenticated, nameInput, appId]);
 
+  // talents 조작
   const modifyTalent = useCallback(async (studentName, amount, type) => {
     if (!db) return;
     const talentDocRef = doc(db, `/artifacts/${appId}/public/data/talents`, studentName);
@@ -823,10 +539,7 @@ const App = () => {
       const docSnap = await getDoc(talentDocRef);
       let currentTalents = docSnap.exists() ? docSnap.data().totalTalents || 0 : 0;
       const newTotal = currentTalents + amount;
-      if (newTotal < 0) {
-        showMessage("Talent cannot go below 0.");
-        return;
-      }
+      if (newTotal < 0) { showMessage("Talent cannot go below 0."); return; }
       if (docSnap.exists()) {
         await updateDoc(talentDocRef, { totalTalents: newTotal });
       } else {
@@ -844,19 +557,13 @@ const App = () => {
     const today = new Date().toISOString().slice(0, 10);
     try {
       await addDoc(collection(db, `/artifacts/${appId}/public/data/questions`), {
-        name: nameInput,
-        text,
-        type,
-        course: selectedCourse,
-        date: today,
-        timestamp: serverTimestamp(),
-        studentLiked: false,
-        adminLiked: false
+        name: nameInput, text, type, course: selectedCourse, date: today,
+        timestamp: serverTimestamp(), studentLiked: false, adminLiked: false
       });
-      showMessage("Submission complete! ✅ ");
+      showMessage("Submission complete! ✅");
       await modifyTalent(nameInput, 1, 'automatic');
     } catch (e) {
-      showMessage("Submission failed. ❌ ");
+      showMessage("Submission failed. ❌");
     }
   }, [db, nameInput, selectedCourse, appId, modifyTalent, showMessage]);
 
@@ -866,11 +573,8 @@ const App = () => {
     setTimeout(() => setClickedButton(null), 1500);
     try {
       await addDoc(collection(db, `/artifacts/${appId}/public/data/feedback`), {
-        name: nameInput,
-        status,
-        course: selectedCourse,
-        date: new Date().toISOString().slice(0, 10),
-        timestamp: serverTimestamp()
+        name: nameInput, status, course: selectedCourse,
+        date: new Date().toISOString().slice(0, 10), timestamp: serverTimestamp()
       });
       showMessage("Feedback submitted!");
     } catch (e) {
@@ -881,9 +585,9 @@ const App = () => {
   const handleAdminLogin = (password) => {
     if (password === ADMIN_PASSWORD) {
       setIsAdmin(true);
-      showMessage("Admin Login successful! 🔑 ");
+      showMessage("Admin Login successful! 🔑");
     } else {
-      showMessage("Incorrect password. 🚫 ");
+      showMessage("Incorrect password. 🚫");
     }
   };
 
@@ -927,12 +631,7 @@ const App = () => {
     if (!db || !isAdmin) return;
     try {
       await addDoc(collection(db, `/artifacts/${appId}/public/data/polls`), {
-        question,
-        options,
-        course: selectedCourse,
-        isActive: true,
-        responses: {},
-        timestamp: serverTimestamp()
+        question, options, course: selectedCourse, isActive: true, responses: {}, timestamp: serverTimestamp()
       });
       showMessage("Poll published successfully!");
     } catch (error) {
@@ -968,11 +667,8 @@ const App = () => {
     const repliesColRef = collection(db, `/artifacts/${appId}/public/data/questions/${postId}/replies`);
     try {
       await addDoc(repliesColRef, {
-        text: replyText,
-        author: getFirstName(nameInput),
-        authorFullName: nameInput,
-        adminLiked: false,
-        timestamp: serverTimestamp()
+        text: replyText, author: getFirstName(nameInput), authorFullName: nameInput,
+        adminLiked: false, timestamp: serverTimestamp()
       });
       await modifyTalent(nameInput, 1, 'peer_reply');
     } catch (error) {
@@ -980,14 +676,19 @@ const App = () => {
     }
   }, [db, nameInput, getFirstName, appId, modifyTalent]);
 
+  // replies 토글 + 구독 관리 (unsubscribe 철저)
   const toggleReplies = useCallback((postId) => {
     setShowReplies(prev => {
       const next = !prev[postId];
+
+      // 끄는 경우: 모두 해제
       if (!next) {
         replyUnsubs.current[postId]?.forEach(unsub => unsub && unsub());
         delete replyUnsubs.current[postId];
         return { ...prev, [postId]: next };
       }
+
+      // 켜는 경우: 기존 해제 후 새로 구독
       replyUnsubs.current[postId]?.forEach(unsub => unsub && unsub());
       replyUnsubs.current[postId] = [];
 
@@ -1000,10 +701,12 @@ const App = () => {
         setReplies(prevR => ({ ...prevR, [postId]: fetchedReplies }));
       });
       replyUnsubs.current[postId].push(unsub);
+
       return { ...prev, [postId]: next };
     });
   }, [db, appId]);
 
+  // 언마운트시 전체 구독 해제
   useEffect(() => {
     return () => {
       Object.values(replyUnsubs.current).forEach(arr => arr.forEach(u => u && u()));
@@ -1019,6 +722,7 @@ const App = () => {
   const isNameEntered = nameInput.trim().length > 0;
   const isReadyToParticipate = isAuthenticated && isClassActive;
 
+  // 관리자 일일 진행표
   const adminDailyProgress = useMemo(() => {
     const roster = COURSE_STUDENTS[selectedCourse] || [];
     const initialProgress = roster.reduce((acc, studentName) => {
@@ -1034,27 +738,32 @@ const App = () => {
     return initialProgress;
   }, [questionsLog, selectedCourse]);
 
+  // 관리자 리스트 분리
   const [reasoningPosts, qcPosts] = useMemo(() => {
     const reasoning = questionsLog.filter(p => p.type === 'reasoning');
     const qc = questionsLog.filter(p => p.type === 'question_comment');
     return [reasoning, qc];
   }, [questionsLog]);
 
+  // 학생 내 리스트 분리
   const [studentReasoningPosts, studentQcPosts] = useMemo(() => {
     const reasoning = allPostsLog.filter(p => p.type === 'reasoning');
     const qc = allPostsLog.filter(p => p.type === 'question_comment');
     return [reasoning, qc];
   }, [allPostsLog]);
 
+  // 관리자/학생 리스트 스크롤 보존용 ref
   const adminListRefQC = React.useRef(null);
   const adminListRefReason = React.useRef(null);
   const studentListRefQC = React.useRef(null);
   const studentListRefReason = React.useRef(null);
-  usePreserveScroll(adminListRefQC, qcPosts);
-  usePreserveScroll(adminListRefReason, reasoningPosts);
-  usePreserveScroll(studentListRefQC, studentQcPosts);
-  usePreserveScroll(studentListRefReason, studentReasoningPosts);
 
+  usePreserveScroll(adminListRefQC, [qcPosts.length]);
+  usePreserveScroll(adminListRefReason, [reasoningPosts.length]);
+  usePreserveScroll(studentListRefQC, [studentQcPosts.length]);
+  usePreserveScroll(studentListRefReason, [studentReasoningPosts.length]);
+
+  // ReplyForm (드래프트를 상위에서 유지)
   const ReplyForm = ({ log, onReply }) => {
     const val = replyDraft[log.id] ?? (log.reply || "");
     const setVal = (v) => setReplyDraft((s) => ({ ...s, [log.id]: v }));
@@ -1066,16 +775,25 @@ const App = () => {
           value={val}
           onChange={(e) => setVal(e.target.value)}
           placeholder="Write a reply..."
-          className="flex-1 p-2 border bg-slate-600 border-slate-500 rounded-lg text-lg" />
+          className="flex-1 p-2 border bg-slate-600 border-slate-500 rounded-lg text-lg"
+        />
         <button onClick={() => onReply(log.id, val)} className="p-2 bg-blue-500 hover:bg-blue-600 text-white text-lg rounded-lg">Send</button>
-        <button onClick={() => { setVal("Addressed in class"); onReply(log.id, "Addressed in class"); }} className="p-2 bg-gray-500 hover:bg-gray-600 text-white text-lg rounded-lg whitespace-nowrap" > Addressed </button>
+        <button
+          onClick={() => { setVal("Addressed in class"); onReply(log.id, "Addressed in class"); }}
+          className="p-2 bg-gray-500 hover:bg-gray-600 text-white text-lg rounded-lg whitespace-nowrap"
+        >
+          Addressed
+        </button>
       </div>
     );
   };
 
   const StudentReplyForm = ({ postId, onAddReply }) => {
     const [replyText, setReplyText] = useState('');
-    const handleSend = () => { onAddReply(postId, replyText); setReplyText(''); };
+    const handleSend = () => {
+      onAddReply(postId, replyText);
+      setReplyText('');
+    };
     return (
       <div className="mt-2 flex items-center space-x-2">
         <input
@@ -1096,14 +814,14 @@ const App = () => {
         <>
           <h1 className="text-5xl font-bold text-center mb-4"><span className="text-green-500">''Ahn''</span>stoppable Learning</h1>
           <CreatePollForm onCreatePoll={handleCreatePoll} onDeactivatePoll={handleDeactivatePoll} activePoll={activePoll} />
+
           <div className="flex justify-between items-center mb-4">
             <button onClick={() => setIsAdmin(false)} className="p-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 text-lg">Back to student view</button>
-            <button
-              onClick={() => setIsAdminAnonymousMode(!isAdminAnonymousMode)}
-              className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-lg">
+            <button onClick={() => setIsAdminAnonymousMode(!isAdminAnonymousMode)} className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-lg">
               {isAdminAnonymousMode ? "Show Student Names" : "Hide Student Names"}
             </button>
           </div>
+
           <div className="flex flex-wrap justify-center gap-2 mb-6">
             {COURSES.map((course) => (
               <button
@@ -1115,6 +833,7 @@ const App = () => {
               </button>
             ))}
           </div>
+
           <select
             value={adminSelectedStudent}
             onChange={(e) => setAdminSelectedStudent(e.target.value)}
@@ -1140,114 +859,542 @@ const App = () => {
                         {log.adminLiked ? (
                           <span className="text-green-500 font-bold text-lg">✓ Liked</span>
                         ) : (
-                          <button onClick={() => handleAdminLike(log.id, log.name)} className="text-3xl"> 👍 </button>
+                          <button onClick={() => handleAdminLike(log.id, log.name)} className="text-3xl">👍</button>
                         )}
-                        <button onClick={() => modifyTalent(log.name, -1, 'penalty')} className="px-3 py-1 bg-red-600 text-white text-md font-bold rounded hover:bg-red-700">-1</button>
+                        <button
+                          onClick={() => modifyTalent(log.name, -1, 'penalty')}
+                          className="px-3 py-1 bg-red-600 text-white text-md font-bold rounded hover:bg-red-700"
+                        >-1</button>
                       </div>
                     </div>
                     {log.reply && <div className="mt-2 p-2 bg-green-900 rounded-lg text-lg"><span className="font-bold">✓ You Replied</span></div>}
+                    <ReplyForm log={log} onReply={handleReply} />
                   </li>
                 ))}
               </ul>
             </div>
           ) : (
             <>
-              <div className="mb-4">
-                <label className="block text-2xl font-bold mb-2">Select Date:</label>
-                <input type="date" value={adminSelectedDate} onChange={(e) => setAdminSelectedDate(e.target.value)} className="p-3 w-full border bg-slate-700 border-slate-500 rounded-lg text-2xl" />
+              <div className="flex justify-center items-center space-x-2 mb-6">
+                <label className="text-2xl text-gray-300">View Logs for Date:</label>
+                <input
+                  type="date"
+                  value={adminSelectedDate}
+                  onChange={(e) => setAdminSelectedDate(e.target.value)}
+                  className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-2xl"
+                />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="text-3xl font-semibold mb-3">Daily Progress</h3>
-                  <div className="p-4 bg-slate-700 rounded-lg">
-                    {COURSE_STUDENTS[selectedCourse].map(studentName => (
-                      <div key={studentName} className="flex justify-between items-center mb-2 p-2 rounded hover:bg-slate-600">
-                        <span className="font-medium text-xl">{isAdminAnonymousMode ? "Anonymous" : getFirstName(studentName)}</span>
-                        <div className="flex items-center space-x-2 text-xl">
-                          <span className={adminDailyProgress[studentName].question_comment > 0 ? 'text-green-400' : ''}>Q: {adminDailyProgress[studentName].question_comment}</span>
-                          <span className={adminDailyProgress[studentName].reasoning > 0 ? 'text-green-400' : ''}>R: {adminDailyProgress[studentName].reasoning}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                <div className="text-left p-4 border border-slate-600 rounded-xl">
+                  <h3 className="text-3xl font-semibold mb-2">Daily Requirement Progress</h3>
+                  <ul className="space-y-1 text-lg h-40 overflow-y-auto">
+                    {Object.entries(adminDailyProgress).map(([name, progress]) => {
+                      const qcMet = progress.question_comment >= 2;
+                      const rMet = progress.reasoning >= 2;
+                      return (
+                        <li key={name} className="flex justify-between items-center pr-2">
+                          <span>{isAdminAnonymousMode ? "Anonymous" : getFirstName(name)}:</span>
+                          <span>
+                            <span className={qcMet ? 'text-green-400' : 'text-red-400'}>{qcMet ? '✅' : '❌'} {progress.question_comment}/2</span>
+                            {" / "}
+                            <span className={rMet ? 'text-green-400' : 'text-red-400'}>{rMet ? '✅' : '❌'} {progress.reasoning}/2</span>
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
 
-                <div>
-                  <h3 className="text-3xl font-semibold mb-3">Today's Feedback</h3>
-                  <div className="p-4 bg-slate-700 rounded-lg">
-                    {feedbackLog.length > 0 ? (
-                      feedbackLog.map((fb, i) => (
-                        <p key={i} className="text-xl mb-1">{isAdminAnonymousMode ? "Anonymous" : getFirstName(fb.name)}: {fb.status}</p>
-                      ))
-                    ) : <p className="text-gray-400 text-lg">No feedback yet for today.</p>}
-                  </div>
+                <div className="text-left p-4 border border-slate-600 rounded-xl">
+                  <h3 className="text-3xl font-semibold">🚦 Daily Understanding Check</h3>
+                  <ul className="h-40 overflow-y-auto text-lg">
+                    {feedbackLog.map((log) => (
+                      <li key={log.id} className="p-2 border-b border-slate-700">
+                        ({log.timestamp?.toDate().toLocaleTimeString()}) {isAdminAnonymousMode ? "Anonymous" : getFirstName(log.name)}: {log.status}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                <div>
-                  <h3 className="text-3xl font-semibold mb-3">Reasoning ({reasoningPosts.length})</h3>
-                  <div ref={adminListRefReason} className="p-4 bg-slate-700 rounded-lg space-y-3 overflow-y-auto max-h-96">
-                    {reasoningPosts.map(log => <AdminLogItem key={log.id} log={log} onReply={handleReply} onLike={handleAdminLike} onPenalty={modifyTalent} isAdminAnonymousMode={isAdminAnonymousMode} ReplyFormComponent={ReplyForm} getFirstName={getFirstName} />)}
-                  </div>
+              <div className="flex flex-col space-y-6 mt-6">
+                <div className="text-left p-4 border border-slate-600 rounded-xl">
+                  <h3 className="text-3xl font-semibold">❓ Questions & Comments</h3>
+                  <ul ref={adminListRefQC} className="h-[600px] overflow-y-auto text-xl mt-2">
+                    {qcPosts.map((log) => (
+                      <li key={log.id} className="p-2 border-b border-slate-700">
+                        <div className="flex justify-between items-start">
+                          <span className="flex-1 mr-2">{isAdminAnonymousMode ? "Anonymous" : getFirstName(log.name)} [{log.type}]: {log.text}</span>
+                          <div className="flex items-center space-x-2 flex-shrink-0">
+                            {log.adminLiked ? (
+                              <span className="text-green-500 font-bold text-lg">✓ Liked</span>
+                            ) : (
+                              <button onClick={() => handleAdminLike(log.id, log.name)} className="text-3xl">👍</button>
+                            )}
+                            <button
+                              onClick={() => modifyTalent(log.name, -1, 'penalty')}
+                              className="px-3 py-1 bg-red-600 text-white text-md font-bold rounded hover:bg-red-700"
+                            >-1</button>
+                          </div>
+                        </div>
+                        {log.reply && <div className="mt-2 p-2 bg-green-900 rounded-lg text-lg"><span className="font-bold">✓ You Replied</span></div>}
+                        <ReplyForm log={log} onReply={handleReply} />
+                        <button onClick={() => toggleReplies(log.id)} className="text-lg text-blue-400 mt-1">
+                          {showReplies[log.id] ? 'Hide Replies' : 'Show Replies'}
+                        </button>
+                        {showReplies[log.id] && (
+                          <div className="mt-2 pl-4 border-l-2 border-slate-500">
+                            <ul className="text-lg mt-2">
+                              {replies[log.id]?.map(reply => (
+                                <li key={reply.id} className="pt-1 flex justify-between items-center">
+                                  <span>{isAdminAnonymousMode ? "Anonymous" : reply.author}: {reply.text}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <div>
-                  <h3 className="text-3xl font-semibold mb-3">Questions & Comments ({qcPosts.length})</h3>
-                  <div ref={adminListRefQC} className="p-4 bg-slate-700 rounded-lg space-y-3 overflow-y-auto max-h-96">
-                    {qcPosts.map(log => <AdminLogItem key={log.id} log={log} onReply={handleReply} onLike={handleAdminLike} onPenalty={modifyTalent} isAdminAnonymousMode={isAdminAnonymousMode} ReplyFormComponent={ReplyForm} getFirstName={getFirstName} />)}
-                  </div>
+
+                <div className="text-left p-4 border border-slate-600 rounded-xl">
+                  <h3 className="text-3xl font-semibold">🤔 Reasoning Posts</h3>
+                  <ul ref={adminListRefReason} className="h-[600px] overflow-y-auto text-xl mt-2">
+                    {reasoningPosts.map((log) => (
+                      <li key={log.id} className="p-2 border-b border-slate-700">
+                        <div className="flex justify-between items-start">
+                          <span className="flex-1 mr-2">{isAdminAnonymousMode ? "Anonymous" : getFirstName(log.name)} [{log.type}]: {log.text}</span>
+                          <div className="flex items-center space-x-2 flex-shrink-0">
+                            {log.adminLiked ? (
+                              <span className="text-green-500 font-bold text-lg">✓ Liked</span>
+                            ) : (
+                              <button onClick={() => handleAdminLike(log.id, log.name)} className="text-3xl">👍</button>
+                            )}
+                            <button
+                              onClick={() => modifyTalent(log.name, -1, 'penalty')}
+                              className="px-3 py-1 bg-red-600 text-white text-md font-bold rounded hover:bg-red-700"
+                            >-1</button>
+                          </div>
+                        </div>
+                        {log.reply && <div className="mt-2 p-2 bg-green-900 rounded-lg text-lg"><span className="font-bold">✓ You Replied</span></div>}
+                        <ReplyForm log={log} onReply={handleReply} />
+                        <button onClick={() => toggleReplies(log.id)} className="text-lg text-blue-400 mt-1">
+                          {showReplies[log.id] ? 'Hide Replies' : 'Show Replies'}
+                        </button>
+                        {showReplies[log.id] && (
+                          <div className="mt-2 pl-4 border-l-2 border-slate-500">
+                            <ul className="text-lg mt-2">
+                              {replies[log.id]?.map(reply => (
+                                <li key={reply.id} className="pt-1 flex justify-between items-center">
+                                  <span>{isAdminAnonymousMode ? "Anonymous" : reply.author}: {reply.text}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
             </>
           )}
+
+          <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
+            <h3 className="text-3xl font-semibold text-gray-100 mb-4">🏆 {selectedCourse} Talent Leaderboard</h3>
+            <TalentGraph talentsData={talentsLog} type="admin" selectedCourse={selectedCourse} getFirstName={getFirstName} />
+          </div>
         </>
       ) : (
-        <StudentView
-          nameInput={nameInput}
-          selectedCourse={selectedCourse}
-          setSelectedCourse={setSelectedCourse}
-          handleNameChange={handleNameChange}
-          isNameEntered={isNameEntered}
-          isAuthenticated={isAuthenticated}
-          isPinRegistered={isPinRegistered}
-          handlePinLogin={handlePinLogin}
-          handlePinRegister={handlePinRegister}
-          getFirstName={getFirstName}
-          isClassActive={isClassActive}
-          isReadyToParticipate={isReadyToParticipate}
-          dailyProgress={dailyProgress}
-          myTotalTalents={myTotalTalents}
-          verbalParticipationCount={verbalParticipationCount}
-          handleVerbalParticipation={handleVerbalParticipation}
-          studentFeedbackLog={studentFeedbackLog}
-          handleFeedback={handleFeedback}
-          clickedButton={clickedButton}
-          studentSelectedDate={studentSelectedDate}
-          setStudentSelectedDate={setStudentSelectedDate}
-          studentReasoningPosts={studentReasoningPosts}
-          studentQcPosts={studentQcPosts}
-          studentListRefQC={studentListRefQC}
-          studentListRefReason={studentListRefReason}
-          handleStudentLike={handleStudentLike}
-          toggleReplies={toggleReplies}
-          showReplies={showReplies}
-          replies={replies}
-          StudentReplyForm={StudentReplyForm}
-          handleAddReply={handleAddReply}
-          activePoll={activePoll}
-          handlePollVote={handlePollVote}
-          userPollVote={userPollVote}
-          talentsLog={talentsLog}
-          handleAddContent={handleAddContent}
-          onAdminLogin={handleAdminLogin}
-        />
+        <>
+          <h1 className="text-5xl font-bold text-center mb-1">
+            <span className="text-green-500">''Ahn''</span>stoppable Learning:<br />
+            <span className="text-orange-500 text-3xl">Freely Ask, Freely Learn</span>
+          </h1>
+
+          {activePoll && <PollComponent poll={activePoll} onVote={handlePollVote} userVote={userPollVote} nameInput={nameInput} />}
+
+          <div className="flex flex-wrap justify-center gap-2 my-6">
+            {COURSES.map((course) => (
+              <button
+                key={course}
+                onClick={() => { setSelectedCourse(course); handleNameChange(''); }}
+                className={`p-3 text-lg font-medium rounded-lg ${selectedCourse === course ? 'bg-orange-500 text-white' : 'bg-slate-600 text-white hover:bg-slate-700'}`}
+              >
+                {course}
+              </button>
+            ))}
+          </div>
+
+          <select
+            value={nameInput}
+            onChange={(e) => handleNameChange(e.target.value)}
+            disabled={isAuthenticated}
+            className="p-3 mb-2 w-full border bg-slate-700 border-slate-500 rounded-lg text-2xl disabled:opacity-50"
+          >
+            <option value="">Select your name...</option>
+            {COURSE_STUDENTS[selectedCourse].map((name, i) => <option key={i} value={name}>{name}</option>)}
+          </select>
+
+          {isNameEntered && !isAuthenticated && (
+            <PinAuth
+              nameInput={nameInput}
+              isPinRegistered={isPinRegistered}
+              onLogin={handlePinLogin}
+              onRegister={handlePinRegister}
+              getFirstName={getFirstName}
+            />
+          )}
+
+          {isAuthenticated && (
+            <div className="mt-4 animate-fade-in">
+              <div className="text-left p-4 border border-slate-600 rounded-xl mb-6">
+                <h3 className="text-2xl font-bold text-yellow-400">Daily Mission & Bonus:</h3>
+                <ul className="list-disc list-inside text-xl mt-2">
+                  <li>Question/Comment (x2): <span className="font-semibold">1 Talent each</span></li>
+                  <li>Reasoning (x2): <span className="font-semibold">1 Talent each</span></li>
+                  <li>Reply to a Peer's Post: <span className="font-semibold">+1 Talent</span></li>
+                  <li>Spoke in class (Max 2): <span className="font-semibold">+1 Talent</span></li>
+                  <li><span className="font-semibold text-yellow-400">Bonus:</span> Get a 'Like' from Prof. Ahn on your original post: <span className="font-semibold">+1 Talent</span></li>
+                </ul>
+              </div>
+
+              <div className="flex justify-center items-center space-x-2 my-4">
+                <label className="text-2xl text-gray-300">View Logs for Date:</label>
+                <input
+                  type="date"
+                  value={studentSelectedDate}
+                  onChange={(e) => setStudentSelectedDate(e.target.value)}
+                  className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-2xl"
+                />
+              </div>
+
+              {!isClassActive && (
+                <div className="text-center p-3 bg-red-800 text-white rounded-lg mb-4 text-xl">
+                  <p>You can only submit new responses during class time.</p>
+                </div>
+              )}
+
+              <div className="p-4 border border-slate-600 rounded-xl mb-6 grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-3xl font-medium text-center text-gray-200">Understanding Check</p>
+                  <div className="flex justify-center space-x-4 mt-2">
+                    <button
+                      onClick={() => handleFeedback('Not Understood 🙁')}
+                      className={`p-4 w-20 h-20 rounded-full bg-red-500 flex justify-center items-center text-4xl ${clickedButton === 'Not Understood 🙁' ? 'ring-4 ring-orange-500' : ''}`}
+                    >🙁</button>
+                    <button
+                      onClick={() => handleFeedback('Confused 🤔')}
+                      className={`p-4 w-20 h-20 rounded-full bg-yellow-400 flex justify-center items-center text-4xl ${clickedButton === 'Confused 🤔' ? 'ring-4 ring-orange-500' : ''}`}
+                    >🤔</button>
+                    <button
+                      onClick={() => handleFeedback('Got It! ✅')}
+                      className={`p-4 w-20 h-20 rounded-full bg-green-500 flex justify-center items-center text-4xl ${clickedButton === 'Got It! ✅' ? 'ring-4 ring-orange-500' : ''}`}
+                    >✅</button>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-3xl font-medium text-center text-gray-200">Verbal Participation</p>
+                  <div className="flex justify-center mt-2">
+                    <button
+                      onClick={handleVerbalParticipation}
+                      disabled={verbalParticipationCount >= 2}
+                      className="p-4 w-44 h-20 rounded-lg bg-sky-500 flex justify-center items-center text-4xl disabled:opacity-50"
+                    >✋</button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-center p-3 bg-slate-700 text-white rounded-lg mb-4">
+                <p className="font-bold text-2xl">Daily Requirement: 4 Talents (2 Q/C + 2 Reasoning)</p>
+                <p className="text-xl">
+                  Today's Progress:
+                  <span className={`mx-1 ${dailyProgress.question_comment >= 2 ? 'text-green-400' : 'text-red-400'}`}>[{dailyProgress.question_comment}/2 Q/C]</span>
+                  <span className={`mx-1 ${dailyProgress.reasoning >= 2 ? 'text-green-400' : 'text-red-400'}`}>[{dailyProgress.reasoning}/2 Reasoning]</span>
+                </p>
+              </div>
+
+              <div className={`p-4 border border-slate-600 rounded-xl mb-6 ${!isReadyToParticipate ? 'opacity-50 pointer-events-none' : ''}`}>
+                <ContentForm
+                  formKey={`${selectedCourse}:${nameInput}:${studentSelectedDate}`}
+                  type="question_comment"
+                  onAddContent={handleAddContent}
+                  isEnabled={isReadyToParticipate}
+                  placeholder="Post 2 Questions/Comments..."
+                />
+                <div className="my-4 border-t border-slate-700"></div>
+                <ContentForm
+                  formKey={`${selectedCourse}:${nameInput}:${studentSelectedDate}`}
+                  type="reasoning"
+                  onAddContent={handleAddContent}
+                  isEnabled={isReadyToParticipate}
+                  placeholder="Post 2 Reasoning posts..."
+                />
+              </div>
+
+              <div className="flex justify-center items-center text-center my-4 p-3 bg-yellow-400 text-black rounded-lg">
+                <img src="/talent-coin.png" alt="Talent coin" className="w-8 h-8 mr-2" />
+                <p className="font-bold text-2xl">My Total Talents: {myTotalTalents}</p>
+              </div>
+
+              <div className="text-left p-4 border border-slate-600 rounded-xl mt-2">
+                <h3 className="text-3xl font-semibold text-gray-100 mb-2">My Talent History</h3>
+                <ul className="text-lg space-y-1">
+                  {talentTransactions.map((log, i) => (
+                    <li key={i} className={`p-1 flex justify-between items-center ${log.points > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      <span><span className="font-bold">{log.points > 0 ? `+${log.points}` : log.points}</span>: {log.type}</span>
+                      <span className="text-base text-gray-500">({log.timestamp?.toDate().toLocaleDateString()})</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {studentSelectedDate && (
+                <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
+                  <h3 className="text-3xl font-semibold">Logs for {studentSelectedDate}</h3>
+
+                  <div className="flex flex-col space-y-6 mt-6">
+                    <div className="text-left">
+                      <h4 className="font-semibold mt-4 text-2xl text-gray-300">❓ Questions & Comments</h4>
+                      <ul ref={studentListRefQC} className="h-[600px] overflow-y-auto text-lg">
+                        {studentQcPosts.map((log) => (
+                          <li key={log.id} className="p-2 border-b border-slate-700">
+                            <div>
+                              {log.name === nameInput && log.adminLiked && <span className="mr-2 text-yellow-400 font-bold">👍 by Prof. Ahn (+1 Bonus)</span>}
+                              [{log.type}]: {log.text}
+                            </div>
+                            {log.name === nameInput && log.reply && (
+                              <div className="mt-2 p-2 bg-slate-600 rounded-lg text-lg text-gray-200 flex justify-between items-center">
+                                <span><b>Prof. Ahn's Reply:</b> {log.reply}</span>
+                                <button
+                                  onClick={() => !log.studentLiked && handleStudentLike(log.id)}
+                                  disabled={log.studentLiked}
+                                  className="ml-2 text-3xl disabled:opacity-50"
+                                >
+                                  {log.studentLiked ? '👍 Liked' : '👍'}
+                                </button>
+                              </div>
+                            )}
+                            <button onClick={() => toggleReplies(log.id)} className="text-lg text-blue-400 mt-1">
+                              {showReplies[log.id] ? 'Hide Replies' : 'Show Replies'}
+                            </button>
+                            {showReplies[log.id] && (
+                              <div className="mt-2 pl-4 border-l-2 border-slate-500">
+                                <StudentReplyForm postId={log.id} onAddReply={handleAddReply} />
+                                <ul className="text-lg mt-2">
+                                  {replies[log.id]?.map(reply => (
+                                    <li key={reply.id} className="pt-1 flex justify-between items-center">
+                                      <span>Anonymous: {reply.text}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="text-left">
+                      <h4 className="font-semibold mt-4 text-2xl text-gray-300">🤔 Reasoning Posts</h4>
+                      <ul ref={studentListRefReason} className="h-[600px] overflow-y-auto text-lg">
+                        {studentReasoningPosts.map((log) => (
+                          <li key={log.id} className="p-2 border-b border-slate-700">
+                            <div>
+                              {log.name === nameInput && log.adminLiked && <span className="mr-2 text-yellow-400 font-bold">👍 by Prof. Ahn (+1 Bonus)</span>}
+                              [{log.type}]: {log.text}
+                            </div>
+                            {log.name === nameInput && log.reply && (
+                              <div className="mt-2 p-2 bg-slate-600 rounded-lg text-lg text-gray-200 flex justify-between items-center">
+                                <span><b>Prof. Ahn's Reply:</b> {log.reply}</span>
+                                <button
+                                  onClick={() => !log.studentLiked && handleStudentLike(log.id)}
+                                  disabled={log.studentLiked}
+                                  className="ml-2 text-3xl disabled:opacity-50"
+                                >
+                                  {log.studentLiked ? '👍 Liked' : '👍'}
+                                </button>
+                              </div>
+                            )}
+                            <button onClick={() => toggleReplies(log.id)} className="text-lg text-blue-400 mt-1">
+                              {showReplies[log.id] ? 'Hide Replies' : 'Show Replies'}
+                            </button>
+                            {showReplies[log.id] && (
+                              <div className="mt-2 pl-4 border-l-2 border-slate-500">
+                                <StudentReplyForm postId={log.id} onAddReply={handleAddReply} />
+                                <ul className="text-lg mt-2">
+                                  {replies[log.id]?.map(reply => (
+                                    <li key={reply.id} className="pt-1 flex justify-between items-center">
+                                      <span>Anonymous: {reply.text}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  <h4 className="font-semibold mt-4 text-2xl text-gray-300">🚦 My Understanding Checks</h4>
+                  <ul className="text-lg">
+                    {studentFeedbackLog.map((log, i) => (
+                      <li key={i} className="p-2 border-b border-slate-700 text-gray-300">
+                        ({log.timestamp?.toDate().toLocaleTimeString()}): {log.status}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
+                <h3 className="text-3xl font-semibold text-gray-100 mb-4">Class Score Range</h3>
+                <TalentGraph talentsData={talentsLog} type="student" selectedCourse={selectedCourse} getFirstName={getFirstName} />
+              </div>
+            </div>
+          )}
+        </>
       )}
-      {showMessageBox && <div className="fixed bottom-5 right-5 bg-green-500 text-white p-4 rounded-lg shadow-lg animate-fade-in-out text-xl">{message}</div>}
+
+      <div className="flex flex-col items-center mt-8 p-4 border-t border-slate-600">
+        <p className="text-xl font-medium text-gray-200 mb-2">Admin Login</p>
+        <AdminLoginForm onAdminLogin={handleAdminLogin} />
+      </div>
     </div>
   );
 
-  return <MainContent />;
+  const CreatePollForm = ({ onCreatePoll, onDeactivatePoll, activePoll }) => {
+    const [question, setQuestion] = useState('');
+    const [options, setOptions] = useState(['', '', '']);
+    const handleOptionChange = (index, value) => {
+      const newOptions = [...options];
+      newOptions[index] = value;
+      setOptions(newOptions);
+    };
+    const addOption = () => setOptions([...options, '']);
+    const handleSubmit = () => {
+      const validOptions = options.filter(opt => opt.trim() !== '');
+      if (question.trim() && validOptions.length > 1) {
+        onCreatePoll(question, validOptions);
+        setQuestion('');
+        setOptions(['', '', '']);
+      } else {
+        alert("Please provide a question and at least two options.");
+      }
+    };
+    if (activePoll) {
+      return (
+        <div className="p-4 border border-slate-600 rounded-xl mb-6">
+          <h3 className="text-3xl font-semibold">Active Poll Results</h3>
+          <PollComponent poll={activePoll} isAdminView={true} userVote={null} />
+          <button onClick={() => onDeactivatePoll(activePoll.id)} className="w-full p-2 mt-4 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xl">Close Poll</button>
+        </div>
+      );
+    }
+    return (
+      <div className="p-4 border border-slate-600 rounded-xl mb-6">
+        <h3 className="text-3xl font-semibold mb-2">Create New Poll</h3>
+        <input
+          type="text"
+          value={question}
+          onChange={e => setQuestion(e.target.value)}
+          placeholder="Poll Question"
+          className="w-full p-2 mb-2 bg-slate-700 border border-slate-500 rounded-lg text-xl"
+        />
+        {options.map((option, index) => (
+          <input
+            key={index}
+            type="text"
+            value={option}
+            onChange={e => handleOptionChange(index, e.target.value)}
+            placeholder={`Option ${index + 1}`}
+            className="w-full p-2 mb-2 bg-slate-700 border border-slate-500 rounded-lg text-xl"
+          />
+        ))}
+        <button onClick={addOption} className="text-lg text-blue-400 mb-2">+ Add Option</button>
+        <button onClick={handleSubmit} className="w-full p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xl">Publish Poll</button>
+      </div>
+    );
+  };
+
+  const PollComponent = ({ poll, onVote, userVote, nameInput, isAdminView = false }) => {
+    const results = useMemo(() => {
+      const responses = poll.responses ? Object.values(poll.responses) : [];
+      const totalVotes = responses.length;
+      const votesPerOption = poll.options.map((_, index) => responses.filter(vote => vote === index).length);
+      return {
+        totalVotes,
+        percentages: votesPerOption.map(count => totalVotes > 0 ? (count / totalVotes) * 100 : 0)
+      };
+    }, [poll]);
+    const hasVoted = userVote !== null;
+
+    return (
+      <div className="p-4 border border-orange-500 rounded-xl my-6 bg-slate-700">
+        <h3 className="text-3xl font-semibold text-orange-400 mb-2">{poll.question}</h3>
+        <div className="space-y-2">
+          {poll.options.map((option, index) => {
+            const percentage = results.percentages[index] || 0;
+            if (hasVoted || isAdminView) {
+              return (
+                <div key={index} className="p-2 bg-slate-600 rounded-lg">
+                  <div className="flex justify-between text-white mb-1 text-xl">
+                    <span>{option}</span>
+                    <span>{percentage.toFixed(0)}%</span>
+                  </div>
+                  <div className="w-full bg-slate-500 rounded-full h-5">
+                    <div className="bg-orange-500 h-5 rounded-full" style={{ width: `${percentage}%` }}></div>
+                  </div>
+                </div>
+              );
+            }
+            return (
+              <button
+                key={index}
+                onClick={() => onVote(poll.id, index)}
+                className="w-full text-left p-3 bg-slate-600 hover:bg-slate-500 rounded-lg text-xl"
+              >
+                {option}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const PhotoGallery = () => (
+    <>
+      <div className="flex justify-center items-center gap-2 sm:gap-4 flex-wrap">
+        {[...Array(7)].map((_, i) =>
+          <img key={i} src={`/photo${i + 1}.jpg`} alt={`Gallery ${i + 1}`} className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />
+        )}
+      </div>
+      <div className="flex justify-center items-center flex-grow my-4"><MainContent /></div>
+      <div className="flex justify-center items-center gap-2 sm:gap-4 flex-wrap">
+        {[...Array(7)].map((_, i) =>
+          <img key={i} src={`/photo${i + 8}.jpg`} alt={`Gallery ${i + 8}`} className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />
+        )}
+      </div>
+    </>
+  );
+
+  return (
+    <div className="min-h-screen w-full bg-custom-beige-bg flex flex-col justify-between p-2 sm:p-4">
+      <PhotoGallery />
+      {showMessageBox && (
+        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-900 text-white p-6 rounded-xl text-center z-50 text-2xl">
+          {message}
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default App;
+
+
