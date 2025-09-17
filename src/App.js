@@ -39,19 +39,11 @@ const COURSE_STUDENTS = {
   ]
 };
 
+// 중요: 이 부분을 Firebase 콘솔에서 복사한 실제 키로 교체해 주세요.
 const firebaseConfig = {
-  apiKey: "// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyCgl2EZSBv5eerKjcFsCGojT68ZwnfGL-U",
-  authDomain: "ahnstoppable-learning.firebaseapp.com",
-  projectId: "ahnstoppable-learning",
-  storageBucket: "ahnstoppable-learning.firebasestorage.app",
-  messagingSenderId: "365013467715",
-  appId: "1:365013467715:web:113e63c822fae43123caf6",
-  measurementId: "G-MT9ETH31MY"
-};", // 이 부분은 원래 사용하시던 키로 유지됩니다.
+  apiKey: "YOUR_API_KEY",
   authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "ahn-app-final-project",
+  projectId: "YOUR_PROJECT_ID",
   storageBucket: "YOUR_STORAGE_BUCKET",
   messagingSenderId: "YOUR_SENDER_ID",
   appId: "YOUR_APP_ID"
