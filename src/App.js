@@ -68,25 +68,18 @@ const isWithinClassTime = (courseName) => {
   }
 };
 
-/** --------------------------
-* 스크롤   보존   훅  ( 리스트   길이   변화   등에서   점프   방지 )
-* -------------------------- */
 function usePreserveScroll(containerRef, deps) {
   React.useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const prevBottomOffset = el.scrollHeight - el.scrollTop;
     requestAnimationFrame(() => {
-      // FIX: 'container.current' was a typo, corrected to 'containerRef.current'
       if (!containerRef.current) return;
       containerRef.current.scrollTop = containerRef.current.scrollHeight - prevBottomOffset;
     });
-  }, [deps, containerRef]); // FIX: Added missing dependency
+  }, deps);
 }
 
-/** --------------------------
-* 그래프
-* -------------------------- */
 const TalentGraph = ({ talentsData, type, selectedCourse, getFirstName }) => {
   const displayData = useMemo(() => {
     const courseRoster = COURSE_STUDENTS[selectedCourse] || [];
@@ -104,7 +97,7 @@ const TalentGraph = ({ talentsData, type, selectedCourse, getFirstName }) => {
       return highest.id === lowest.id ? [highest] : [highest, lowest];
     }
     return [];
-  }, [talentsData, selectedCourse, type]); // FIX: Removed unnecessary dependency
+  }, [talentsData, selectedCourse, type, getFirstName]);
 
   if (displayData.length === 0) return <p className="text-gray-400 text-lg">No talent data yet.</p>;
   const maxScore = displayData.length > 0 ? displayData[0].totalTalents : 0;
@@ -128,9 +121,6 @@ const TalentGraph = ({ talentsData, type, selectedCourse, getFirstName }) => {
   );
 };
 
-/** --------------------------
-* 입력   폼  ( 자동   임시저장  /  복원  /  디바운스 )
-* -------------------------- */
 const ContentForm = React.memo(function ContentForm({
   formKey,
   type,
@@ -556,10 +546,6 @@ const CreatePollForm = ({ onCreatePoll, onDeactivatePoll, activePoll }) => {
   );
 };
 
-
-/** --------------------------
-* 메인  App
-* -------------------------- */
 const App = () => {
   const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
   const [db, setDb] = useState(null);
@@ -576,6 +562,7 @@ const App = () => {
   const [studentSelectedDate, setStudentSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [dailyProgress, setDailyProgress] = useState({ question_comment: 0, reasoning: 0 });
   const [myTotalTalents, setMyTotalTalents] = useState(0);
+  const [verbalParticipationCount, setVerbalParticipationCount] = useState(0);
   const [studentFeedbackLog, setStudentFeedbackLog] = useState([]);
   const [clickedButton, setClickedButton] = useState(null);
   const [adminSelectedDate, setAdminSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -589,7 +576,6 @@ const App = () => {
   const [replies, setReplies] = useState({});
   const [showReplies, setShowReplies] = useState({});
   const [isAdminAnonymousMode, setIsAdminAnonymousMode] = useState(false);
-  const [verbalParticipationCount, setVerbalParticipationCount] = useState(0);
   const [replyDraft, setReplyDraft] = useState({});
   const replyUnsubs = React.useRef({});
 
@@ -609,15 +595,16 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    const firebaseConfig = {
-      apiKey: "AIzaSyCgl2EZSBv5eerKjcFsCGojT68ZwnfGL-U",
-      authDomain: "ahnstoppable-learning.firebaseapp.com",
-      projectId: "ahnstoppable-learning",
-      storageBucket: "ahnstoppable-learning.appspot.com",
-      messagingSenderId: "365013467715",
-      appId: "1:365013467715:web:113e63c822fae43123caf6",
-      measurementId: "G-MT9ETH31MY"
-    };
+    // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyCgl2EZSBv5eerKjcFsCGojT68ZwnfGL-U",
+  authDomain: "ahnstoppable-learning.firebaseapp.com",
+  projectId: "ahnstoppable-learning",
+  storageBucket: "ahnstoppable-learning.firebasestorage.app",
+  messagingSenderId: "365013467715",
+  appId: "1:365013467715:web:113e63c822fae43123caf6",
+  measurementId: "G-MT9ETH31MY"
+};
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     setDb(getFirestore(app));
