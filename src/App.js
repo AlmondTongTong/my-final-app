@@ -104,7 +104,7 @@ const TalentGraph = ({ talentsData, type, selectedCourse, getFirstName }) => {
       return highest.id === lowest.id ? [highest] : [highest, lowest];
     }
     return [];
-  }, [talentsData, selectedCourse, type]);
+  }, [talentsData, selectedCourse, type, getFirstName]);
 
   if (displayData.length === 0) return <p className="text-gray-400 text-lg">No talent data yet.</p>;
   const maxScore = displayData.length > 0 ? displayData[0].totalTalents : 0;
@@ -264,7 +264,6 @@ const PinAuth = React.memo(({ nameInput, isPinRegistered, onLogin, onRegister, g
   );
 });
 
-// FIX: This component is defined BEFORE StudentView to prevent reference errors.
 const StudentPostItem = ({
   post, nameInput, getFirstName, handleStudentLike,
   toggleReplies, showReplies, replies, StudentReplyForm, handleAddReply
@@ -302,7 +301,7 @@ const StudentView = ({
   studentListRefQC, studentListRefReason, handleStudentLike, toggleReplies,
   showReplies, replies, StudentReplyForm, handleAddReply, activePoll,
   handlePollVote, userPollVote, talentsLog, handleAddContent, onAdminLogin,
-  isClassActive // FIX: This prop was missing
+  isClassActive
 }) => {
 
   const talentsDataForGraph = useMemo(() =>
@@ -357,9 +356,7 @@ const StudentView = ({
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column */}
             <div className="lg:col-span-1 space-y-6">
-              {/* My Status */}
               <div className="p-4 bg-slate-700 rounded-xl">
                 <h2 className="text-3xl font-semibold mb-3">My Status</h2>
                 <div className="flex justify-around items-center text-center p-3 bg-yellow-400 text-black rounded-lg">
@@ -374,7 +371,6 @@ const StudentView = ({
                 {isReadyToParticipate && <button onClick={handleVerbalParticipation} className="w-full mt-3 p-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-xl">Verbal Participation</button>}
               </div>
 
-              {/* Today's Feedback */}
               <div className="p-4 bg-slate-700 rounded-xl">
                 <h2 className="text-3xl font-semibold mb-3">Today's Feedback</h2>
                 <div className="space-y-2">
@@ -399,7 +395,6 @@ const StudentView = ({
                 </div>
               </div>
 
-              {/* Poll */}
               {activePoll && (
                 <div className="p-4 bg-slate-700 rounded-xl">
                   <h2 className="text-3xl font-semibold mb-3">Live Poll</h2>
@@ -420,7 +415,6 @@ const StudentView = ({
                 </div>
               )}
 
-              {/* Talent Graph */}
               <div className="p-4 bg-slate-700 rounded-xl">
                 <h2 className="text-3xl font-semibold mb-3">Talent Ranking</h2>
                 <TalentGraph talentsData={talentsDataForGraph} type="student" selectedCourse={selectedCourse} getFirstName={getFirstName} />
@@ -428,9 +422,7 @@ const StudentView = ({
 
             </div>
 
-            {/* Right Column */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Add Content */}
               <div className="p-4 bg-slate-700 rounded-xl">
                 <h2 className="text-3xl font-semibold mb-3">Add Content</h2>
                 <div className="space-y-4">
@@ -451,7 +443,6 @@ const StudentView = ({
                 </div>
               </div>
 
-              {/* Class Posts */}
               <div className="p-4 bg-slate-700 rounded-xl">
                 <div className="flex justify-between items-center mb-3">
                   <h2 className="text-3xl font-semibold">Today's Posts</h2>
@@ -482,6 +473,86 @@ const StudentView = ({
         </div>
       )}
     </>
+  );
+};
+
+const AdminLogItem = ({ log, onReply, onLike, onPenalty, isAdminAnonymousMode, ReplyFormComponent, getFirstName }) => (
+  <div className="p-3 bg-slate-600 rounded-lg">
+    <div className="flex justify-between items-start">
+      <div className="flex-1 mr-2 text-xl">
+        <span className="font-bold">{isAdminAnonymousMode ? "Anonymous" : getFirstName(log.name)}: </span>
+        {log.text}
+      </div>
+      <div className="flex items-center space-x-2 flex-shrink-0">
+        {log.adminLiked ? <span className="text-green-500 font-bold text-lg">✓ Liked</span> : <button onClick={() => onLike(log.id, log.name)} className="text-3xl">👍</button>}
+        <button onClick={() => onPenalty(log.name, -1, 'penalty')} className="px-3 py-1 bg-red-600 text-white text-md font-bold rounded hover:bg-red-700">-1</button>
+      </div>
+    </div>
+    <ReplyFormComponent log={log} onReply={onReply} />
+  </div>
+);
+
+const CreatePollForm = ({ onCreatePoll, onDeactivatePoll, activePoll }) => {
+  const [question, setQuestion] = useState('');
+  const [options, setOptions] = useState(['', '']);
+
+  const handleOptionChange = (index, value) => {
+    const newOptions = [...options];
+    newOptions[index] = value;
+    setOptions(newOptions);
+  };
+
+  const addOption = () => setOptions([...options, '']);
+  const removeOption = (index) => setOptions(options.filter((_, i) => i !== index));
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (question.trim() && options.every(o => o.trim())) {
+      onCreatePoll(question, options.map(o => o.trim()));
+      setQuestion('');
+      setOptions(['', '']);
+    }
+  };
+
+  return (
+    <div className="my-6 p-4 border border-slate-600 rounded-xl">
+      <h2 className="text-3xl font-semibold mb-4 text-center">Poll Management</h2>
+      {activePoll ? (
+        <div className="text-center">
+          <p className="text-xl mb-2">Current active poll:</p>
+          <p className="font-bold text-2xl mb-4">{activePoll.question}</p>
+          <button onClick={() => onDeactivatePoll(activePoll.id)} className="p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 text-xl">Close Current Poll</button>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <input
+            type="text"
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder="Poll Question"
+            className="w-full p-3 border bg-slate-700 border-slate-500 rounded-lg text-2xl"
+            required
+          />
+          {options.map((option, index) => (
+            <div key={index} className="flex items-center space-x-2">
+              <input
+                type="text"
+                value={option}
+                onChange={(e) => handleOptionChange(index, e.target.value)}
+                placeholder={`Option ${index + 1}`}
+                className="flex-1 p-3 border bg-slate-700 border-slate-500 rounded-lg text-2xl"
+                required
+              />
+              {options.length > 2 && <button type="button" onClick={() => removeOption(index)} className="p-2 bg-red-600 text-white rounded-full text-lg">X</button>}
+            </div>
+          ))}
+          <div className="flex justify-between">
+            <button type="button" onClick={addOption} className="p-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 text-lg">Add Option</button>
+            <button type="submit" className="p-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold text-xl">Create Poll</button>
+          </div>
+        </form>
+      )}
+    </div>
   );
 };
 
@@ -539,16 +610,12 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyCgl2EZSBv5eerKjcFsCGojT68ZwnfGL-U",
-  authDomain: "ahnstoppable-learning.firebaseapp.com",
-  projectId: "ahnstoppable-learning",
-  storageBucket: "ahnstoppable-learning.firebasestorage.app",
-  messagingSenderId: "365013467715",
-  appId: "1:365013467715:web:113e63c822fae43123caf6",
-  measurementId: "G-MT9ETH31MY"
-};
+    const firebaseConfig = {
+      // 중요: 이 부분을 실제 Firebase 키로 교체해야 합니다.
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_AUTH_DOMAIN",
+      projectId: "YOUR_PROJECT_ID"
+    };
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     setDb(getFirestore(app));
@@ -1125,13 +1192,13 @@ const firebaseConfig = {
                 <div>
                   <h3 className="text-3xl font-semibold mb-3">Reasoning ({reasoningPosts.length})</h3>
                   <div ref={adminListRefReason} className="p-4 bg-slate-700 rounded-lg space-y-3 overflow-y-auto max-h-96">
-                    {reasoningPosts.map(log => <AdminLogItem key={log.id} log={log} onReply={handleReply} onLike={handleAdminLike} onPenalty={modifyTalent} isAdminAnonymousMode={isAdminAnonymousMode} ReplyFormComponent={ReplyForm} />)}
+                    {reasoningPosts.map(log => <AdminLogItem key={log.id} log={log} onReply={handleReply} onLike={handleAdminLike} onPenalty={modifyTalent} isAdminAnonymousMode={isAdminAnonymousMode} ReplyFormComponent={ReplyForm} getFirstName={getFirstName} />)}
                   </div>
                 </div>
                 <div>
                   <h3 className="text-3xl font-semibold mb-3">Questions & Comments ({qcPosts.length})</h3>
                   <div ref={adminListRefQC} className="p-4 bg-slate-700 rounded-lg space-y-3 overflow-y-auto max-h-96">
-                    {qcPosts.map(log => <AdminLogItem key={log.id} log={log} onReply={handleReply} onLike={handleAdminLike} onPenalty={modifyTalent} isAdminAnonymousMode={isAdminAnonymousMode} ReplyFormComponent={ReplyForm} />)}
+                    {qcPosts.map(log => <AdminLogItem key={log.id} log={log} onReply={handleReply} onLike={handleAdminLike} onPenalty={modifyTalent} isAdminAnonymousMode={isAdminAnonymousMode} ReplyFormComponent={ReplyForm} getFirstName={getFirstName} />)}
                   </div>
                 </div>
               </div>
@@ -1184,86 +1251,6 @@ const firebaseConfig = {
   );
 
   return <MainContent />;
-};
-
-const AdminLogItem = ({ log, onReply, onLike, onPenalty, isAdminAnonymousMode, ReplyFormComponent }) => (
-  <div className="p-3 bg-slate-600 rounded-lg">
-    <div className="flex justify-between items-start">
-      <div className="flex-1 mr-2 text-xl">
-        <span className="font-bold">{isAdminAnonymousMode ? "Anonymous" : getFirstName(log.name)}: </span>
-        {log.text}
-      </div>
-      <div className="flex items-center space-x-2 flex-shrink-0">
-        {log.adminLiked ? <span className="text-green-500 font-bold text-lg">✓ Liked</span> : <button onClick={() => onLike(log.id, log.name)} className="text-3xl">👍</button>}
-        <button onClick={() => onPenalty(log.name, -1, 'penalty')} className="px-3 py-1 bg-red-600 text-white text-md font-bold rounded hover:bg-red-700">-1</button>
-      </div>
-    </div>
-    <ReplyFormComponent log={log} onReply={onReply} />
-  </div>
-);
-
-const CreatePollForm = ({ onCreatePoll, onDeactivatePoll, activePoll }) => {
-  const [question, setQuestion] = useState('');
-  const [options, setOptions] = useState(['', '']);
-
-  const handleOptionChange = (index, value) => {
-    const newOptions = [...options];
-    newOptions[index] = value;
-    setOptions(newOptions);
-  };
-
-  const addOption = () => setOptions([...options, '']);
-  const removeOption = (index) => setOptions(options.filter((_, i) => i !== index));
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (question.trim() && options.every(o => o.trim())) {
-      onCreatePoll(question, options.map(o => o.trim()));
-      setQuestion('');
-      setOptions(['', '']);
-    }
-  };
-
-  return (
-    <div className="my-6 p-4 border border-slate-600 rounded-xl">
-      <h2 className="text-3xl font-semibold mb-4 text-center">Poll Management</h2>
-      {activePoll ? (
-        <div className="text-center">
-          <p className="text-xl mb-2">Current active poll:</p>
-          <p className="font-bold text-2xl mb-4">{activePoll.question}</p>
-          <button onClick={() => onDeactivatePoll(activePoll.id)} className="p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 text-xl">Close Current Poll</button>
-        </div>
-      ) : (
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <input
-            type="text"
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            placeholder="Poll Question"
-            className="w-full p-3 border bg-slate-700 border-slate-500 rounded-lg text-2xl"
-            required
-          />
-          {options.map((option, index) => (
-            <div key={index} className="flex items-center space-x-2">
-              <input
-                type="text"
-                value={option}
-                onChange={(e) => handleOptionChange(index, e.target.value)}
-                placeholder={`Option ${index + 1}`}
-                className="flex-1 p-3 border bg-slate-700 border-slate-500 rounded-lg text-2xl"
-                required
-              />
-              {options.length > 2 && <button type="button" onClick={() => removeOption(index)} className="p-2 bg-red-600 text-white rounded-full text-lg">X</button>}
-            </div>
-          ))}
-          <div className="flex justify-between">
-            <button type="button" onClick={addOption} className="p-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 text-lg">Add Option</button>
-            <button type="submit" className="p-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold text-xl">Create Poll</button>
-          </div>
-        </form>
-      )}
-    </div>
-  );
 };
 
 export default App;
