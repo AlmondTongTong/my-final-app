@@ -77,7 +77,6 @@ function usePreserveScroll(containerRef, deps) {
     if (!el) return;
     const prevBottomOffset = el.scrollHeight - el.scrollTop;
     requestAnimationFrame(() => {
-      // FIX: 'container.current' was a typo, corrected to 'containerRef.current'
       if (!containerRef.current) return;
       containerRef.current.scrollTop = containerRef.current.scrollHeight - prevBottomOffset;
     });
@@ -610,11 +609,15 @@ const App = () => {
   }, []);
 
   useEffect(() => {
+    // For Firebase JS SDK v7.20.0 and later, measurementId is optional
     const firebaseConfig = {
-      // 중요: 이 부분을 실제 Firebase 키로 교체해야 합니다.
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_AUTH_DOMAIN",
-      projectId: "YOUR_PROJECT_ID"
+        apiKey: "AIzaSyCgl2EZSBv5eerKjcFsCGojT68ZwnfGL-U",
+        authDomain: "ahnstoppable-learning.firebaseapp.com",
+        projectId: "ahnstoppable-learning",
+        storageBucket: "ahnstoppable-learning.appspot.com",
+        messagingSenderId: "365013467715",
+        appId: "1:365013467715:web:113e63c822fae43123caf6",
+        measurementId: "G-MT9ETH31MY"
     };
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
