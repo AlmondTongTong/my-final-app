@@ -1,3 +1,4 @@
+/* global __app_id */
 import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
@@ -69,12 +70,12 @@ const PostInput = ({ title, onSubmit, placeholder }) => {
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        className="w-full h-24 p-2 border rounded-lg"
+        className="w-full h-24 p-2 border rounded-lg bg-white"
         placeholder={placeholder}
       />
       <button
         onClick={handleSubmit}
-        className="mt-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+        className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
       >
         Submit
       </button>
@@ -97,7 +98,7 @@ const App = () => {
   };
 
   useEffect(scrollToBottom, [messages]);
-  
+
   useEffect(() => {
     signInAnonymously(auth).catch(alert);
   }, []);
@@ -132,7 +133,7 @@ const App = () => {
 
   const handleAdminLogin = () => {
     const password = prompt("Enter admin password:");
-    if (password === "adv375") { 
+    if (password === "adv375") {
       setIsAdmin(true);
       setStudentName("Admin");
     } else {
@@ -149,7 +150,7 @@ const App = () => {
   const handleStudentSelection = (name) => {
     setStudentName(name);
   };
-  
+
   const handlePostSubmit = async (text) => {
     if (!text || !auth.currentUser) return;
     await addDoc(collection(db, 'courses', selectedCourse, 'messages'), {
@@ -214,7 +215,7 @@ const App = () => {
     const currentDalants = dalantSnap.exists() ? dalantSnap.data().count : 0;
     await updateDoc(dalantRef, { count: currentDalants + 1 });
   };
-  
+
   const MainContent = () => {
     const [replyText, setReplyText] = useState('');
     const [activeReplyId, setActiveReplyId] = useState(null);
@@ -226,95 +227,95 @@ const App = () => {
     };
 
     if (!selectedCourse || !studentName) return null;
-    
+
     return (
-      <div className="w-full max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-md" style={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
-        <h2 className="text-3xl font-bold mb-4">{selectedCourse} - {studentName}</h2>
-        
-        <div className="space-y-4">
-          {messages.map(msg => (
-            <div key={msg.id} className={`p-3 rounded-lg ${msg.author === studentName ? 'bg-blue-100' : 'bg-gray-100'}`}>
-              <p className="font-semibold">{msg.author} <span className="text-sm text-gray-500">{msg.timestamp?.toDate().toLocaleString()}</span></p>
-              <p className="whitespace-pre-wrap">{msg.text}</p>
-              
-              {msg.replies && msg.replies.map((reply, index) => (
-                <div key={index} className="ml-4 mt-2 p-2 rounded-lg bg-gray-200">
-                  <p className="font-semibold text-sm">{reply.author} <span className="text-xs text-gray-500">{new Date(reply.timestamp.seconds * 1000).toLocaleString()}</span></p>
-                  <p className="text-sm whitespace-pre-wrap">{reply.text}</p>
-                </div>
-              ))}
+        <div className="w-full max-w-4xl mx-auto bg-white/80 p-4 sm:p-6 rounded-lg shadow-md overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-4 text-gray-800">{selectedCourse} - {studentName}</h2>
+            
+            <div className="space-y-4">
+                {messages.map(msg => (
+                    <div key={msg.id} className={`p-3 rounded-lg ${msg.author === studentName ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                        <p className="font-semibold text-gray-700">{msg.author} <span className="text-sm text-gray-500">{msg.timestamp?.toDate().toLocaleString()}</span></p>
+                        <p className="text-gray-800 whitespace-pre-wrap">{msg.text}</p>
+                        
+                        {msg.replies && msg.replies.map((reply, index) => (
+                            <div key={index} className="ml-4 mt-2 p-2 rounded-lg bg-gray-200">
+                                <p className="font-semibold text-sm text-gray-600">{reply.author} <span className="text-xs text-gray-500">{new Date(reply.timestamp.seconds * 1000).toLocaleString()}</span></p>
+                                <p className="text-sm text-gray-700 whitespace-pre-wrap">{reply.text}</p>
+                            </div>
+                        ))}
 
-              <div className="flex items-center mt-2">
-                {isAdmin && (
-                  <button onClick={() => handleDalant(msg.author)} className="text-sm text-yellow-500 hover:underline mr-4">달란트</button>
-                )}
-                <button onClick={() => setActiveReplyId(msg.id)} className="text-sm text-blue-600 hover:underline">Reply</button>
-              </div>
-
-              {activeReplyId === msg.id && (
-                <div className="mt-2">
-                  <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} className="w-full h-16 p-2 border rounded-lg" placeholder="Write a reply..." />
-                  <button onClick={() => onReplySubmit(msg.id)} className="mt-1 px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600">Submit Reply</button>
-                  <button onClick={() => setActiveReplyId(null)} className="ml-2 mt-1 px-3 py-1 bg-gray-400 text-white text-sm rounded hover:bg-gray-500">Cancel</button>
-                </div>
-              )}
+                        <div className="flex items-center mt-2">
+                           {isAdmin && <button onClick={() => handleDalant(msg.author)} className="text-sm text-yellow-500 hover:underline mr-4">달란트</button>}
+                           <button onClick={() => setActiveReplyId(msg.id)} className="text-sm text-blue-600 hover:underline">Reply</button>
+                        </div>
+  
+                        {activeReplyId === msg.id && (
+                          <div className="mt-2">
+                              <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} className="w-full h-16 p-2 border rounded-lg bg-white" placeholder="Write a reply..." />
+                              <button onClick={() => onReplySubmit(msg.id)} className="mt-1 px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600">Submit Reply</button>
+                              <button onClick={() => setActiveReplyId(null)} className="ml-2 mt-1 px-3 py-1 bg-gray-400 text-white text-sm rounded hover:bg-gray-500">Cancel</button>
+                          </div>
+                        )}
+                    </div>
+                ))}
             </div>
-          ))}
-        </div>
 
-        <PostInput
-          title="Questions and Comments"
-          onSubmit={handlePostSubmit}
-          placeholder="Type your question or comment here..."
-        />
+            <PostInput
+              title="Questions and Comments"
+              onSubmit={handlePostSubmit}
+              placeholder="Type your question or comment here..."
+            />
 
-        <PostInput
-          title="Reasoning Posts"
-          onSubmit={handleReasoningSubmit}
-          placeholder="Share your reasoning..."
-        />
-        
-        {isAdmin && <AdminPollCreation onCreatePoll={handlePollSubmit} />}
-        <div className="mt-6 space-y-6">
-          {polls.map((poll) => (
-            <Poll key={poll.id} poll={poll} onVote={handleVote} />
-          ))}
+            <PostInput
+              title="Reasoning Posts"
+              onSubmit={handleReasoningSubmit}
+              placeholder="Share your reasoning..."
+            />
+            
+            {isAdmin && <AdminPollCreation onCreatePoll={handlePollSubmit} />}
+            <div className="mt-6 space-y-6">
+              {polls.map((poll) => (
+                <Poll key={poll.id} poll={poll} onVote={handleVote} />
+              ))}
+            </div>
+            <div ref={messagesEndRef} />
         </div>
-        <div ref={messagesEndRef} />
-      </div>
-    );
-  };
+      );
+    };
 
   const AdminPollCreation = ({ onCreatePoll }) => {
     const [question, setQuestion] = useState('');
     const [options, setOptions] = useState(['', '']);
-  
+
     const handleOptionChange = (index, value) => {
       const newOptions = [...options];
       newOptions[index] = value;
       setOptions(newOptions);
     };
-  
+
     const addOption = () => {
       setOptions([...options, '']);
     };
-  
+
     const handleSubmit = (e) => {
       e.preventDefault();
       onCreatePoll(question, options);
       setQuestion('');
       setOptions(['', '']);
     };
-  
+
     return (
-      <form onSubmit={handleSubmit} className="my-4 p-4 border rounded-lg bg-gray-200">
+      <form onSubmit={handleSubmit} className="my-4 p-4 border rounded-lg bg-slate-200">
         <h3 className="text-xl font-bold mb-2">Create New Poll</h3>
         <input type="text" value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Poll Question" className="w-full p-2 border rounded-lg mb-2" required />
         {options.map((option, index) => (
           <input key={index} type="text" value={option} onChange={(e) => handleOptionChange(index, e.target.value)} placeholder={`Option ${index + 1}`} className="w-full p-2 border rounded-lg mb-2" required />
         ))}
-        <button type="button" onClick={addOption} className="mr-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Add Option</button>
-        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Create Poll</button>
+        <div className="flex justify-between items-center">
+          <button type="button" onClick={addOption} className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Add Option</button>
+          <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Create Poll</button>
+        </div>
       </form>
     );
   };
@@ -324,26 +325,26 @@ const App = () => {
     const userHasVoted = localStorage.getItem(`voted_${poll.id}_${auth.currentUser.uid}`);
   
     return (
-      <div className="my-4 p-4 border rounded-lg bg-gray-700 text-white">
+      <div className="my-4 p-4 border rounded-lg bg-slate-700/80 text-white shadow-lg">
         <h3 className="text-2xl font-bold mb-4">{poll.question}</h3>
         <div className="space-y-2">
           {poll.options.map((option, index) => {
             if (userHasVoted) {
               const percentage = totalVotes === 0 ? 0 : ((poll.votes[index] / totalVotes) * 100).toFixed(1);
               return (
-                <div key={index} className="p-3 bg-gray-600 rounded-lg">
-                  <div className="flex justify-between">
+                <div key={index} className="p-3 bg-slate-500 rounded-lg">
+                  <div className="flex justify-between items-center text-xl">
                     <span>{option}</span>
                     <span>{percentage}% ({poll.votes[index]})</span>
                   </div>
-                  <div className="w-full bg-gray-500 rounded-full h-2.5 mt-1">
-                    <div className="bg-blue-500 h-2.5 rounded-full" style={{ width: `${percentage}%` }}></div>
+                  <div className="w-full bg-slate-600 rounded-full h-4 mt-1">
+                    <div className="bg-blue-500 h-4 rounded-full" style={{ width: `${percentage}%` }}></div>
                   </div>
                 </div>
               );
             }
             return (
-              <button key={index} onClick={() => onVote(poll.id, index)} className="w-full text-left p-3 bg-gray-600 hover:bg-gray-500 rounded-lg">
+              <button key={index} onClick={() => onVote(poll.id, index)} className="w-full text-left p-3 bg-slate-600 hover:bg-slate-500 rounded-lg text-xl">
                 {option}
               </button>
             );
@@ -352,11 +353,29 @@ const App = () => {
       </div>
     );
   };
+  
+  // 원래 디자인을 보존하기 위해 PhotoGallery 컴포넌트를 되살렸습니다.
+  const PhotoGallery = () => (
+    <>
+      <div className="flex justify-center items-center gap-2 sm:gap-4 flex-wrap">
+        {[...Array(7)].map((_, i) =>
+          <img key={i} src={`/photo${i + 1}.jpg`} alt={`Gallery ${i + 1}`} className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />
+        )}
+      </div>
+      <div className="flex justify-center items-center flex-grow my-4"><MainContent /></div>
+      <div className="flex justify-center items-center gap-2 sm:gap-4 flex-wrap">
+        {[...Array(7)].map((_, i) =>
+          <img key={i} src={`/photo${i + 8}.jpg`} alt={`Gallery ${i + 8}`} className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />
+        )}
+      </div>
+    </>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center p-4">
+    // 원래 디자인을 보존하기 위해 최상위 div의 className을 복원했습니다.
+    <div className="min-h-screen w-full bg-custom-beige-bg flex flex-col justify-between p-2 sm:p-4">
       <header className="w-full max-w-6xl mx-auto mb-4">
-        <h1 className="text-5xl font-bold text-center text-gray-800">Ahn's Collaborative Learning App</h1>
+        <h1 className="text-4xl sm:text-5xl font-bold text-center text-gray-800 font-serif">Ahn's Collaborative Learning App</h1>
         <div className="mt-4 flex justify-center gap-4">
             {Object.entries(dalants).map(([name, count]) => (
                 <div key={name} className="text-center">
@@ -366,7 +385,7 @@ const App = () => {
             ))}
         </div>
         {!selectedCourse ? (
-          <div className="flex justify-center gap-4 mt-4">
+          <div className="flex justify-center gap-2 sm:gap-4 mt-4">
             {COURSES.map(course => <button key={course} onClick={() => handleCourseSelection(course)} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">{course}</button>)}
             <button onClick={handleAdminLogin} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Admin</button>
           </div>
@@ -387,10 +406,11 @@ const App = () => {
         )}
       </header>
 
-      {selectedCourse && studentName && <MainContent />}
+      {/* PhotoGallery가 다시 정상적으로 렌더링되도록 수정했습니다. */}
+      {selectedCourse && studentName && <PhotoGallery />}
 
-      <footer className="w-full text-center mt-4">
-        <p className="text-gray-600">&copy; {new Date().getFullYear()} Ahn's App. All rights reserved.</p>
+      <footer className="w-full text-center py-2">
+        <p className="text-gray-600 text-sm">&copy; {new Date().getFullYear()} Ahn's App. All rights reserved.</p>
       </footer>
     </div>
   );
