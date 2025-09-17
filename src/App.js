@@ -1,4 +1,3 @@
-/* global __app_id */
 import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
@@ -354,7 +353,6 @@ const App = () => {
     );
   };
   
-  // 원래 디자인을 보존하기 위해 PhotoGallery 컴포넌트를 되살렸습니다.
   const PhotoGallery = () => (
     <>
       <div className="flex justify-center items-center gap-2 sm:gap-4 flex-wrap">
@@ -372,7 +370,6 @@ const App = () => {
   );
 
   return (
-    // 원래 디자인을 보존하기 위해 최상위 div의 className을 복원했습니다.
     <div className="min-h-screen w-full bg-custom-beige-bg flex flex-col justify-between p-2 sm:p-4">
       <header className="w-full max-w-6xl mx-auto mb-4">
         <h1 className="text-4xl sm:text-5xl font-bold text-center text-gray-800 font-serif">Ahn's Collaborative Learning App</h1>
@@ -406,7 +403,6 @@ const App = () => {
         )}
       </header>
 
-      {/* PhotoGallery가 다시 정상적으로 렌더링되도록 수정했습니다. */}
       {selectedCourse && studentName && <PhotoGallery />}
 
       <footer className="w-full text-center py-2">
