@@ -41,7 +41,7 @@ const ADDITIONAL_READ_IDS = (process.env.REACT_APP_ADDITIONAL_READ_APP_IDS || ''
 const safeTime = (ts) => { try { return ts?.toDate?.().toLocaleTimeString() || ''; } catch { return ''; } };
 const safeDate = (ts) => { try { return ts?.toDate?.().toLocaleDateString() || ''; } catch { return ''; } };
 const toStartOfDay = (isoDate) => new Date(isoDate + "T00:00:00");
-const toEndOfDay = (isoDate) => new Date(isoDate + "T23:59:59.999");
+const toEndOfDay   = (isoDate) => new Date(isoDate + "T23:59:59.999");
 
 const isWithinClassTime = (courseName) => {
   const now = new Date();
@@ -56,17 +56,16 @@ const isWithinClassTime = (courseName) => {
   }
 };
 
-/* 리스트가 늘거나 줄어도 "바닥 고정" 스크롤 유지 */
+/* 리스트 증가/감소 시 "바닥 고정" */
 function usePreserveBottomScroll(ref, deps) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const prevAtBottom = Math.abs(el.scrollHeight - el.clientHeight - el.scrollTop) < 4;
+    const wasAtBottom = Math.abs(el.scrollHeight - el.clientHeight - el.scrollTop) < 4;
     const prevBottom = el.scrollHeight - el.scrollTop;
     requestAnimationFrame(() => {
       if (!ref.current) return;
-      // 기존에 바닥이었으면 바닥 유지, 아니면 상대 위치 유지
-      ref.current.scrollTop = prevAtBottom ? ref.current.scrollHeight : (ref.current.scrollHeight - prevBottom);
+      ref.current.scrollTop = wasAtBottom ? ref.current.scrollHeight : (ref.current.scrollHeight - prevBottom);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
@@ -112,8 +111,7 @@ const TalentGraph = ({ talentsData, type, selectedCourse, getFirstName }) => {
 };
 
 /* =========================
-   ContentForm with localStorage draft
-   (항상 마운트 유지, "제출 버튼"만 비활성화)
+   ContentForm (draft 보존 + 폼 상시 마운트)
    ========================= */
 const ContentForm = React.memo(({ formKey, type, onAddContent, canSubmit, placeholder }) => {
   const STORAGE_KEY = 'draft:' + formKey + ':' + type;
@@ -132,10 +130,7 @@ const ContentForm = React.memo(({ formKey, type, onAddContent, canSubmit, placeh
     onAddContent(text, type);
     setText('');
     localStorage.removeItem(STORAGE_KEY);
-    // 제출 후에도 스크롤/포커스 유지
-    requestAnimationFrame(() => {
-      taRef.current?.focus();
-    });
+    requestAnimationFrame(() => taRef.current?.focus());
   };
 
   return (
@@ -145,7 +140,6 @@ const ContentForm = React.memo(({ formKey, type, onAddContent, canSubmit, placeh
         value={text}
         onChange={onChange}
         placeholder={placeholder}
-        // 입력은 항상 가능, 제출만 통제
         className="flex-1 p-3 border bg-slate-700 border-slate-500 rounded-lg text-2xl resize-none h-28"
       />
       <button
@@ -213,7 +207,7 @@ const App = () => {
     ? __app_id
     : (process.env.REACT_APP_APP_ID || 'default-app-id');
 
-  const ADMIN_PASSWORD = '0811'; // used
+  const ADMIN_PASSWORD = '0811';
 
   const [db, setDb] = useState(null);
 
@@ -313,7 +307,7 @@ const App = () => {
     } catch { showMessage("Error registering PIN."); }
   }, [db, nameInput, resolvedAppId, getFirstName, showMessage]);
 
-  /* Class time check (입력 중 스크롤/포커스 영향 최소화) */
+  /* Class time check (입력 안정성 유지) */
   useEffect(() => {
     const checkTime = () => setIsClassActive(isWithinClassTime(selectedCourse));
     checkTime();
@@ -321,87 +315,155 @@ const App = () => {
     return () => clearInterval(interval);
   }, [selectedCourse]);
 
-  /* ======= 📌 핵심 변경 1: Merged 구독 - timestamp 범위 기반 ======= */
-  const subscribeMergedQuestions = useCallback(({ course, date, byStudentName, setState, daysBack = 14 }) => {
-    if (!db) return () => {};
-    const appIds = [resolvedAppId, ...ADDITIONAL_READ_IDS];
+  /* =========================
+     🔧 핵심: 멀티 쿼리 병합 구독 헬퍼
+     ========================= */
+  function multiSubscribeMerge(queryDefs, onMerged) {
     const unsubs = [];
-    const key = (docRef) => docRef.path;
-    setState([]); // reset
-    const map = new Map();
-
-    appIds.forEach((appId) => {
-      const base = collection(db, `/artifacts/${appId}/public/data/questions`);
-      const wheres = [ where("course","==",course) ];
-      if (byStudentName) wheres.push(where("name","==",byStudentName));
-
-      let qRef;
-      if (date) {
-        const start = toStartOfDay(date);
-        const end = toEndOfDay(date);
-        qRef = query(base, ...wheres, where("timestamp", ">=", start), where("timestamp", "<=", end), orderBy("timestamp","asc"));
-      } else {
-        const start = new Date(); start.setDate(start.getDate() - daysBack);
-        qRef = query(base, ...wheres, where("timestamp", ">=", start), orderBy("timestamp","asc"));
-      }
-
-      const unsub = onSnapshot(qRef, (snap) => {
-        snap.docChanges().forEach((ch) => {
-          const d = ch.doc.data();
-          const idKey = key(ch.doc.ref);
-          if (ch.type === "removed") { map.delete(idKey); return; }
-          // timestamp 누락 대비: createdAtClient로 보정
-          const ts =
-            d.timestamp?.toDate?.() ??
-            (typeof d.createdAtClient === 'number' ? new Date(d.createdAtClient) : null);
-          map.set(idKey, { id: ch.doc.id, ...d, _path: idKey, _appId: appId, _ts: ts?.getTime?.() || 0 });
-        });
-        setState(Array.from(map.values()).sort((a,b)=> (a._ts||0) - (b._ts||0)));
+    const map = new Map(); // key = ref.path
+    const pushAll = (appId, snap) => {
+      snap.docChanges().forEach(ch => {
+        const refPath = ch.doc.ref.path;
+        if (ch.type === "removed") { map.delete(refPath); return; }
+        const d = ch.doc.data();
+        const ts =
+          d.timestamp?.toDate?.() ??
+          (typeof d.createdAtClient === "number" ? new Date(d.createdAtClient) : null);
+        map.set(refPath, { id: ch.doc.id, ...d, _path: refPath, _appId: appId, _ts: ts?.getTime?.() || 0 });
       });
+      onMerged(Array.from(map.values()));
+    };
+    queryDefs.forEach(({ appId, qRef }) => {
+      const unsub = onSnapshot(
+        qRef,
+        (snap) => pushAll(appId, snap),
+        (err) => { console.warn("query fallback:", err?.message); }
+      );
       unsubs.push(unsub);
     });
-    return () => unsubs.forEach(u=>u());
-  }, [db, resolvedAppId]);
+    return () => unsubs.forEach(u => u && u());
+  }
 
-  const subscribeMergedFeedback = useCallback(({ course, date, byStudentName, setState, daysBack = 14 }) => {
-    if (!db) return () => {};
-    const appIds = [resolvedAppId, ...ADDITIONAL_READ_IDS];
-    const unsubs = [];
-    const key = (docRef) => docRef.path;
-    setState([]);
-    const map = new Map();
+  /* =========================
+     ✅ subscribeMergedQuestions (레거시 완전 커버)
+     ========================= */
+  const subscribeMergedQuestions = useCallback(
+    ({ course, date, byStudentName, setState, daysBack = 14 }) => {
+      if (!db) return () => {};
+      const appIds = [resolvedAppId, ...ADDITIONAL_READ_IDS];
 
-    appIds.forEach((appId) => {
-      const base = collection(db, `/artifacts/${appId}/public/data/feedback`);
-      const wheres = [ where("course","==",course) ];
-      if (byStudentName) wheres.push(where("name","==",byStudentName));
+      const start = date ? toStartOfDay(date) : new Date(Date.now() - daysBack * 24 * 3600 * 1000);
+      const end   = date ? toEndOfDay(date)   : null;
 
-      let qRef;
-      if (date) {
-        const start = toStartOfDay(date);
-        const end = toEndOfDay(date);
-        qRef = query(base, ...wheres, where("timestamp", ">=", start), where("timestamp", "<=", end), orderBy("timestamp","asc"));
-      } else {
-        const start = new Date(); start.setDate(start.getDate() - daysBack);
-        qRef = query(base, ...wheres, where("timestamp", ">=", start), orderBy("timestamp","asc"));
-      }
+      const queryDefs = [];
+      appIds.forEach((appId) => {
+        const base = collection(db, `/artifacts/${appId}/public/data/questions`);
 
-      const unsub = onSnapshot(qRef, (snap) => {
-        snap.docChanges().forEach((ch) => {
-          const d = ch.doc.data();
-          const idKey = key(ch.doc.ref);
-          if (ch.type === "removed") { map.delete(idKey); return; }
-          const ts =
-            d.timestamp?.toDate?.() ??
-            (typeof d.createdAtClient === 'number' ? new Date(d.createdAtClient) : null);
-          map.set(idKey, { id: ch.doc.id, ...d, _path: idKey, _appId: appId, _ts: ts?.getTime?.() || 0 });
-        });
-        setState(Array.from(map.values()).sort((a,b)=> (a._ts||0) - (b._ts||0)));
+        // Q1: 최신 스키마 - timestamp 범위 + course
+        try {
+          let wheres = [ where("course","==",course), where("timestamp",">=", start) ];
+          if (end) wheres.push(where("timestamp","<=", end));
+          if (byStudentName) wheres.push(where("name","==",byStudentName));
+          queryDefs.push({ appId, qRef: query(base, ...wheres, orderBy("timestamp","asc")) });
+        } catch(e) {}
+
+        // Q2: 레거시 - timestamp 범위 (course 필드 없는 문서용)
+        try {
+          let wheres = [ where("timestamp",">=", start) ];
+          if (end) wheres.push(where("timestamp","<=", end));
+          if (byStudentName) wheres.push(where("name","==",byStudentName));
+          queryDefs.push({ appId, qRef: query(base, ...wheres, orderBy("timestamp","asc")) });
+        } catch(e) {}
+
+        // Q3: 레거시 - createdAtClient(ms) 범위
+        try {
+          let wheres = [ where("createdAtClient", ">=", start.getTime()) ];
+          if (end) wheres.push(where("createdAtClient", "<=", end.getTime()));
+          if (byStudentName) wheres.push(where("name","==",byStudentName));
+          queryDefs.push({ appId, qRef: query(base, ...wheres) }); // 정렬은 클라에서 _ts로
+        } catch(e) {}
+
+        // Q4: 레거시 - date == 'YYYY-MM-DD'
+        if (date) {
+          try {
+            let wheres = [ where("date","==",date) ];
+            if (byStudentName) wheres.push(where("name","==",byStudentName));
+            queryDefs.push({ appId, qRef: query(base, ...wheres) });
+          } catch(e) {}
+        }
       });
-      unsubs.push(unsub);
-    });
-    return () => unsubs.forEach(u=>u());
-  }, [db, resolvedAppId]);
+
+      const unsub = multiSubscribeMerge(queryDefs, (rows) => {
+        // course 필드가 없으면 보여주기 위해 통과(soft filter)
+        const filtered = rows.filter(r => (r.course ? r.course === course : true));
+        filtered.sort((a,b) => (a._ts||0) - (b._ts||0) || (a.text||"").localeCompare(b.text||""));
+        setState(filtered);
+      });
+
+      return unsub;
+    },
+    [db, resolvedAppId]
+  );
+
+  /* =========================
+     ✅ subscribeMergedFeedback (레거시 완전 커버)
+     ========================= */
+  const subscribeMergedFeedback = useCallback(
+    ({ course, date, byStudentName, setState, daysBack = 14 }) => {
+      if (!db) return () => {};
+      const appIds = [resolvedAppId, ...ADDITIONAL_READ_IDS];
+
+      const start = date ? toStartOfDay(date) : new Date(Date.now() - daysBack * 24 * 3600 * 1000);
+      const end   = date ? toEndOfDay(date)   : null;
+
+      const queryDefs = [];
+      appIds.forEach((appId) => {
+        const base = collection(db, `/artifacts/${appId}/public/data/feedback`);
+
+        // F1: 최신 - timestamp 범위 + course
+        try {
+          let wheres = [ where("course","==",course), where("timestamp",">=", start) ];
+          if (end) wheres.push(where("timestamp","<=", end));
+          if (byStudentName) wheres.push(where("name","==",byStudentName));
+          queryDefs.push({ appId, qRef: query(base, ...wheres, orderBy("timestamp","asc")) });
+        } catch(e) {}
+
+        // F2: 레거시 - timestamp 범위 (course 없음)
+        try {
+          let wheres = [ where("timestamp",">=", start) ];
+          if (end) wheres.push(where("timestamp","<=", end));
+          if (byStudentName) wheres.push(where("name","==",byStudentName));
+          queryDefs.push({ appId, qRef: query(base, ...wheres, orderBy("timestamp","asc")) });
+        } catch(e) {}
+
+        // F3: 레거시 - createdAtClient(ms) 범위
+        try {
+          let wheres = [ where("createdAtClient", ">=", start.getTime()) ];
+          if (end) wheres.push(where("createdAtClient", "<=", end.getTime()));
+          if (byStudentName) wheres.push(where("name","==",byStudentName));
+          queryDefs.push({ appId, qRef: query(base, ...wheres) });
+        } catch(e) {}
+
+        // F4: 레거시 - date == 'YYYY-MM-DD'
+        if (date) {
+          try {
+            let wheres = [ where("date","==",date) ];
+            if (byStudentName) wheres.push(where("name","==",byStudentName));
+            queryDefs.push({ appId, qRef: query(base, ...wheres) });
+          } catch(e) {}
+        }
+      });
+
+      const unsub = multiSubscribeMerge(queryDefs, (rows) => {
+        const filtered = rows.filter(r => (r.course ? r.course === course : true));
+        filtered.sort((a,b) => (a._ts||0) - (b._ts||0) || (a.status||"").localeCompare(b.status||""));
+        setState(filtered);
+      });
+
+      return unsub;
+    },
+    [db, resolvedAppId]
+  );
 
   /* Talents (현재 appId) */
   useEffect(() => {
@@ -475,7 +537,7 @@ const App = () => {
     const talentDocRef = doc(db, `/artifacts/${resolvedAppId}/public/data/talents`, nameInput);
     const unsubM = onSnapshot(talentDocRef, d => setMyTotalTalents(d.exists()? d.data().totalTalents : 0));
 
-    // 해당 날짜 전체 포스트(모든 appId 병합, timestamp 범위)
+    // 해당 날짜 전체 포스트(모든 appId 병합, 멀티쿼리)
     const offAll = subscribeMergedQuestions({
       course: selectedCourse,
       date: studentSelectedDate,
@@ -645,7 +707,6 @@ const App = () => {
             });
             setReplies(prevR => {
               const prevList = prevR[postId] || [];
-              // 같은 id는 교체, 없는 건 추가
               const mergedMap = new Map(prevList.map(x => [x.id, x]));
               fetched.forEach(x => mergedMap.set(x.id, x));
               const merged = Array.from(mergedMap.values()).sort((a,b)=> (a._ts||0)-(b._ts||0));
@@ -908,7 +969,7 @@ const App = () => {
                   <div className="text-left p-4 border border-slate-600 rounded-xl">
                     <h3 className="text-3xl font-semibold">❓ Questions & Comments</h3>
                     <PostList
-                      posts={qcPostsAdmin}
+                      posts={reasoningPostsAdmin.length || qcPostsAdmin.length ? qcPostsAdmin : []}
                       type="admin"
                       onAdminLike={handleAdminLike}
                       onPenalty={(n)=>modifyTalent(n,-1,'penalty')}
@@ -1005,7 +1066,7 @@ const App = () => {
                   </div>
                 </div>
 
-                {/* 폼은 항상 렌더 → 입력 중 스크롤/포커스 안정, 제출만 통제 */}
+                {/* 폼은 항상 렌더 → 입력 안정, 제출만 통제 */}
                 <div className="p-4 border border-slate-600 rounded-xl mb-6">
                   <ContentForm
                     formKey={`${selectedCourse}:${nameInput}:${studentSelectedDate}`}
@@ -1134,7 +1195,7 @@ const App = () => {
     );
   };
 
-  /* 갤러리 리플로우 방지: 고정 크기 제공 */
+  /* 갤러리: 리플로우 방지 고정 크기 */
   const StableImg = ({ src, alt }) => (
     <img
       src={src}
