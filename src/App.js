@@ -40,6 +40,8 @@ const ADDITIONAL_READ_IDS = (process.env.REACT_APP_ADDITIONAL_READ_APP_IDS || ''
    ========================= */
 const safeTime = (ts) => { try { return ts?.toDate?.().toLocaleTimeString() || ''; } catch { return ''; } };
 const safeDate = (ts) => { try { return ts?.toDate?.().toLocaleDateString() || ''; } catch { return ''; } };
+const toStartOfDay = (isoDate) => new Date(isoDate + "T00:00:00");
+const toEndOfDay = (isoDate) => new Date(isoDate + "T23:59:59.999");
 
 const isWithinClassTime = (courseName) => {
   const now = new Date();
@@ -54,14 +56,17 @@ const isWithinClassTime = (courseName) => {
   }
 };
 
-function usePreserveScroll(ref, deps) {
+/* 리스트가 늘거나 줄어도 "바닥 고정" 스크롤 유지 */
+function usePreserveBottomScroll(ref, deps) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    const prevAtBottom = Math.abs(el.scrollHeight - el.clientHeight - el.scrollTop) < 4;
     const prevBottom = el.scrollHeight - el.scrollTop;
     requestAnimationFrame(() => {
       if (!ref.current) return;
-      ref.current.scrollTop = ref.current.scrollHeight - prevBottom;
+      // 기존에 바닥이었으면 바닥 유지, 아니면 상대 위치 유지
+      ref.current.scrollTop = prevAtBottom ? ref.current.scrollHeight : (ref.current.scrollHeight - prevBottom);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
@@ -108,10 +113,12 @@ const TalentGraph = ({ talentsData, type, selectedCourse, getFirstName }) => {
 
 /* =========================
    ContentForm with localStorage draft
+   (항상 마운트 유지, "제출 버튼"만 비활성화)
    ========================= */
-const ContentForm = React.memo(({ formKey, type, onAddContent, isEnabled, placeholder }) => {
+const ContentForm = React.memo(({ formKey, type, onAddContent, canSubmit, placeholder }) => {
   const STORAGE_KEY = 'draft:' + formKey + ':' + type;
   const [text, setText] = useState(() => localStorage.getItem(STORAGE_KEY) || '');
+  const taRef = useRef(null);
 
   const onChange = (e) => {
     const v = e.target.value;
@@ -121,18 +128,31 @@ const ContentForm = React.memo(({ formKey, type, onAddContent, isEnabled, placeh
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!text.trim()) return;
+    if (!text.trim() || !canSubmit) return;
     onAddContent(text, type);
     setText('');
     localStorage.removeItem(STORAGE_KEY);
+    // 제출 후에도 스크롤/포커스 유지
+    requestAnimationFrame(() => {
+      taRef.current?.focus();
+    });
   };
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-      <textarea value={text} onChange={onChange} placeholder={placeholder} disabled={!isEnabled}
-        className="flex-1 p-3 border bg-slate-700 border-slate-500 rounded-lg text-2xl resize-none h-28" />
-      <button type="submit" disabled={!isEnabled || !text.trim()}
-        className="p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg disabled:opacity-50 self-end sm:self-center text-xl">
+      <textarea
+        ref={taRef}
+        value={text}
+        onChange={onChange}
+        placeholder={placeholder}
+        // 입력은 항상 가능, 제출만 통제
+        className="flex-1 p-3 border bg-slate-700 border-slate-500 rounded-lg text-2xl resize-none h-28"
+      />
+      <button
+        type="submit"
+        disabled={!canSubmit || !text.trim()}
+        className="p-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg disabled:opacity-50 self-end sm:self-center text-xl"
+      >
         Add
       </button>
     </form>
@@ -293,7 +313,7 @@ const App = () => {
     } catch { showMessage("Error registering PIN."); }
   }, [db, nameInput, resolvedAppId, getFirstName, showMessage]);
 
-  /* Class time check */
+  /* Class time check (입력 중 스크롤/포커스 영향 최소화) */
   useEffect(() => {
     const checkTime = () => setIsClassActive(isWithinClassTime(selectedCourse));
     checkTime();
@@ -301,8 +321,8 @@ const App = () => {
     return () => clearInterval(interval);
   }, [selectedCourse]);
 
-  /* ======= subscribe helpers: useCallback로 메모이즈 ======= */
-  const subscribeMergedQuestions = useCallback(({ course, date, byStudentName, setState }) => {
+  /* ======= 📌 핵심 변경 1: Merged 구독 - timestamp 범위 기반 ======= */
+  const subscribeMergedQuestions = useCallback(({ course, date, byStudentName, setState, daysBack = 14 }) => {
     if (!db) return () => {};
     const appIds = [resolvedAppId, ...ADDITIONAL_READ_IDS];
     const unsubs = [];
@@ -313,28 +333,37 @@ const App = () => {
     appIds.forEach((appId) => {
       const base = collection(db, `/artifacts/${appId}/public/data/questions`);
       const wheres = [ where("course","==",course) ];
-      if (date) wheres.push(where("date","==",date));
       if (byStudentName) wheres.push(where("name","==",byStudentName));
-      const qRef = query(base, ...wheres, orderBy("timestamp","asc"));
+
+      let qRef;
+      if (date) {
+        const start = toStartOfDay(date);
+        const end = toEndOfDay(date);
+        qRef = query(base, ...wheres, where("timestamp", ">=", start), where("timestamp", "<=", end), orderBy("timestamp","asc"));
+      } else {
+        const start = new Date(); start.setDate(start.getDate() - daysBack);
+        qRef = query(base, ...wheres, where("timestamp", ">=", start), orderBy("timestamp","asc"));
+      }
+
       const unsub = onSnapshot(qRef, (snap) => {
         snap.docChanges().forEach((ch) => {
           const d = ch.doc.data();
           const idKey = key(ch.doc.ref);
           if (ch.type === "removed") { map.delete(idKey); return; }
-          map.set(idKey, { id: ch.doc.id, ...d, _path: idKey, _appId: appId });
+          // timestamp 누락 대비: createdAtClient로 보정
+          const ts =
+            d.timestamp?.toDate?.() ??
+            (typeof d.createdAtClient === 'number' ? new Date(d.createdAtClient) : null);
+          map.set(idKey, { id: ch.doc.id, ...d, _path: idKey, _appId: appId, _ts: ts?.getTime?.() || 0 });
         });
-        setState(Array.from(map.values()).sort((a,b)=>{
-          const ta = a.timestamp?.seconds || 0;
-          const tb = b.timestamp?.seconds || 0;
-          return ta - tb;
-        }));
+        setState(Array.from(map.values()).sort((a,b)=> (a._ts||0) - (b._ts||0)));
       });
       unsubs.push(unsub);
     });
     return () => unsubs.forEach(u=>u());
   }, [db, resolvedAppId]);
 
-  const subscribeMergedFeedback = useCallback(({ course, date, byStudentName, setState }) => {
+  const subscribeMergedFeedback = useCallback(({ course, date, byStudentName, setState, daysBack = 14 }) => {
     if (!db) return () => {};
     const appIds = [resolvedAppId, ...ADDITIONAL_READ_IDS];
     const unsubs = [];
@@ -345,21 +374,29 @@ const App = () => {
     appIds.forEach((appId) => {
       const base = collection(db, `/artifacts/${appId}/public/data/feedback`);
       const wheres = [ where("course","==",course) ];
-      if (date) wheres.push(where("date","==",date));
       if (byStudentName) wheres.push(where("name","==",byStudentName));
-      const qRef = query(base, ...wheres, orderBy("timestamp","asc"));
+
+      let qRef;
+      if (date) {
+        const start = toStartOfDay(date);
+        const end = toEndOfDay(date);
+        qRef = query(base, ...wheres, where("timestamp", ">=", start), where("timestamp", "<=", end), orderBy("timestamp","asc"));
+      } else {
+        const start = new Date(); start.setDate(start.getDate() - daysBack);
+        qRef = query(base, ...wheres, where("timestamp", ">=", start), orderBy("timestamp","asc"));
+      }
+
       const unsub = onSnapshot(qRef, (snap) => {
         snap.docChanges().forEach((ch) => {
           const d = ch.doc.data();
           const idKey = key(ch.doc.ref);
           if (ch.type === "removed") { map.delete(idKey); return; }
-          map.set(idKey, { id: ch.doc.id, ...d, _path: idKey, _appId: appId });
+          const ts =
+            d.timestamp?.toDate?.() ??
+            (typeof d.createdAtClient === 'number' ? new Date(d.createdAtClient) : null);
+          map.set(idKey, { id: ch.doc.id, ...d, _path: idKey, _appId: appId, _ts: ts?.getTime?.() || 0 });
         });
-        setState(Array.from(map.values()).sort((a,b)=>{
-          const ta = a.timestamp?.seconds || 0;
-          const tb = b.timestamp?.seconds || 0;
-          return ta - tb;
-        }));
+        setState(Array.from(map.values()).sort((a,b)=> (a._ts||0) - (b._ts||0)));
       });
       unsubs.push(unsub);
     });
@@ -380,8 +417,8 @@ const App = () => {
   /* Admin lists (해당 날짜 전체) */
   const adminListRefQC = useRef(null);
   const adminListRefReason = useRef(null);
-  usePreserveScroll(adminListRefQC, [questionsLog.length]);
-  usePreserveScroll(adminListRefReason, [questionsLog.length]);
+  usePreserveBottomScroll(adminListRefQC, [questionsLog.length]);
+  usePreserveBottomScroll(adminListRefReason, [questionsLog.length]);
 
   useEffect(() => {
     if (!db || !isAdmin) return;
@@ -412,8 +449,8 @@ const App = () => {
   /* Student view (본인 포함, 해당 날짜 전체) */
   const studentListRefQC = useRef(null);
   const studentListRefReason = useRef(null);
-  usePreserveScroll(studentListRefQC, [allPostsLog.length]);
-  usePreserveScroll(studentListRefReason, [allPostsLog.length]);
+  usePreserveBottomScroll(studentListRefQC, [allPostsLog.length]);
+  usePreserveBottomScroll(studentListRefReason, [allPostsLog.length]);
 
   useEffect(() => {
     if (!db || isAdmin || !nameInput || !isAuthenticated) {
@@ -438,7 +475,7 @@ const App = () => {
     const talentDocRef = doc(db, `/artifacts/${resolvedAppId}/public/data/talents`, nameInput);
     const unsubM = onSnapshot(talentDocRef, d => setMyTotalTalents(d.exists()? d.data().totalTalents : 0));
 
-    // 해당 날짜 전체 포스트(모든 appId 병합)
+    // 해당 날짜 전체 포스트(모든 appId 병합, timestamp 범위)
     const offAll = subscribeMergedQuestions({
       course: selectedCourse,
       date: studentSelectedDate,
@@ -584,7 +621,7 @@ const App = () => {
     }
   }, [db, nameInput, getFirstName, resolvedAppId, modifyTalent]);
 
-  /* Replies subscriptions (토글 시 다중 appId 병합) */
+  /* Replies subscriptions (토글 시 다중 appId 병합, timestamp 정렬) */
   const replyUnsubs = useRef({});
   const toggleReplies = useCallback((postId) => {
     setShowReplies(prev => {
@@ -599,15 +636,20 @@ const App = () => {
             orderBy("timestamp","asc")
           );
           return onSnapshot(qRef, (snapshot) => {
-            const fetched = snapshot.docs.map(d => ({ id: `${appId}:${d.id}`, ...d.data() }));
+            const fetched = snapshot.docs.map(d => {
+              const data = d.data();
+              const ts =
+                data.timestamp?.toDate?.() ??
+                (typeof data.createdAtClient === 'number' ? new Date(data.createdAtClient) : null);
+              return { id: `${appId}:${d.id}`, ...data, _ts: ts?.getTime?.() || 0 };
+            });
             setReplies(prevR => {
               const prevList = prevR[postId] || [];
-              const others = prevList.filter(x => !fetched.find(y => y.id === x.id));
-              return { ...prevR, [postId]: [...others, ...fetched].sort((a,b)=>{
-                const ta = a.timestamp?.seconds || 0;
-                const tb = b.timestamp?.seconds || 0;
-                return ta - tb;
-              }) };
+              // 같은 id는 교체, 없는 건 추가
+              const mergedMap = new Map(prevList.map(x => [x.id, x]));
+              fetched.forEach(x => mergedMap.set(x.id, x));
+              const merged = Array.from(mergedMap.values()).sort((a,b)=> (a._ts||0)-(b._ts||0));
+              return { ...prevR, [postId]: merged };
             });
           });
         });
@@ -628,7 +670,7 @@ const App = () => {
   }, []);
 
   const isNameEntered = nameInput.trim().length > 0;
-  const isReadyToParticipate = isAuthenticated && isClassActive;
+  const canSubmit = isAuthenticated && isClassActive; // 폼은 항상 입력 가능, 제출만 허용
 
   /* Admin Daily Progress */
   const adminDailyProgress = useMemo(() => {
@@ -963,10 +1005,26 @@ const App = () => {
                   </div>
                 </div>
 
-                <div className={`p-4 border border-slate-600 rounded-xl mb-6 ${!isReadyToParticipate ? 'opacity-50 pointer-events-none' : ''}`}>
-                  <ContentForm formKey={`${selectedCourse}:${nameInput}:${studentSelectedDate}`} type="question_comment" onAddContent={handleAddContent} isEnabled={isReadyToParticipate} placeholder="Post 2 Questions/Comments..." />
+                {/* 폼은 항상 렌더 → 입력 중 스크롤/포커스 안정, 제출만 통제 */}
+                <div className="p-4 border border-slate-600 rounded-xl mb-6">
+                  <ContentForm
+                    formKey={`${selectedCourse}:${nameInput}:${studentSelectedDate}`}
+                    type="question_comment"
+                    onAddContent={handleAddContent}
+                    canSubmit={canSubmit}
+                    placeholder="Post 2 Questions/Comments..."
+                  />
                   <div className="my-4 border-t border-slate-700" />
-                  <ContentForm formKey={`${selectedCourse}:${nameInput}:${studentSelectedDate}`} type="reasoning" onAddContent={handleAddContent} isEnabled={isReadyToParticipate} placeholder="Post 2 Reasoning posts..." />
+                  <ContentForm
+                    formKey={`${selectedCourse}:${nameInput}:${studentSelectedDate}`}
+                    type="reasoning"
+                    onAddContent={handleAddContent}
+                    canSubmit={canSubmit}
+                    placeholder="Post 2 Reasoning posts..."
+                  />
+                  {!canSubmit && (
+                    <p className="text-sm text-gray-400 mt-2">* You can type anytime. Submission activates during class time.</p>
+                  )}
                 </div>
 
                 <div className="text-center p-3 bg-slate-700 text-white rounded-lg mb-4">
@@ -1076,10 +1134,23 @@ const App = () => {
     );
   };
 
+  /* 갤러리 리플로우 방지: 고정 크기 제공 */
+  const StableImg = ({ src, alt }) => (
+    <img
+      src={src}
+      alt={alt}
+      width={128}
+      height={96}
+      loading="lazy"
+      className="h-24 sm:h-32 w-auto rounded-lg shadow-lg"
+      style={{ aspectRatio: '4 / 3' }}
+    />
+  );
+
   const PhotoGallery = ({ handleFeedback, handleVerbalParticipation, handleStudentLike }) => (
     <>
       <div className="flex justify-center items-center gap-2 sm:gap-4 flex-wrap">
-        {[...Array(7)].map((_,i)=><img key={i} src={`/photo${i+1}.jpg`} alt={`Gallery ${i+1}`} className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />)}
+        {[...Array(7)].map((_,i)=><StableImg key={i} src={`/photo${i+1}.jpg`} alt={`Gallery ${i+1}`} />)}
       </div>
       <div className="flex justify-center items-center flex-grow my-4">
         <MainContent
@@ -1089,7 +1160,7 @@ const App = () => {
         />
       </div>
       <div className="flex justify-center items-center gap-2 sm:gap-4 flex-wrap">
-        {[...Array(7)].map((_,i)=><img key={i} src={`/photo${i+8}.jpg`} alt={`Gallery ${i+8}`} className="h-24 sm:h-32 w-auto rounded-lg shadow-lg" />)}
+        {[...Array(7)].map((_,i)=><StableImg key={i} src={`/photo${i+8}.jpg`} alt={`Gallery ${i+8}`} />)}
       </div>
     </>
   );
