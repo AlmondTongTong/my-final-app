@@ -56,6 +56,11 @@ const isWithinClassTime = (courseName) => {
   }
 };
 
+/* ===== Light theme helpers for Q/C & Reasoning sections ===== */
+const LIGHT_CARD = "bg-white text-black border border-slate-300 rounded-xl";
+const LIGHT_INPUT = "bg-white text-black border border-slate-300 placeholder-slate-400";
+const LIGHT_DIVIDER = "border-slate-200";
+
 /* 리스트 증가/감소 시 "바닥 고정" */
 function usePreserveBottomScroll(ref, deps) {
   useEffect(() => {
@@ -751,57 +756,87 @@ const App = () => {
   const studentReasoningPosts = allPostsLog.filter(p => p.type === 'reasoning');
   const studentQcPosts = allPostsLog.filter(p => p.type === 'question_comment');
 
-  /* Inline components */
-  const ReplyForm = ({ log, onReply }) => {
+  /* Inline components (LIGHT 지원) */
+  const ReplyForm = ({ log, onReply, theme = "dark" }) => {
+    const light = theme === "light";
     const [replyText, setReplyText] = useState(log.reply || '');
     return (
       <div className="mt-2 flex items-center space-x-2">
-        <input type="text" value={replyText} onChange={(e)=>setReplyText(e.target.value)} placeholder="Write a reply..."
-          className="flex-1 p-2 border bg-slate-600 border-slate-500 rounded-lg text-lg" />
+        <input
+          type="text"
+          value={replyText}
+          onChange={(e)=>setReplyText(e.target.value)}
+          placeholder="Write a reply..."
+          className={`flex-1 p-2 border rounded-lg text-lg
+            ${light ? LIGHT_INPUT : "bg-slate-600 border-slate-500 text-white"}`}
+        />
         <button onClick={()=>onReply(log.id, replyText)} className="p-2 bg-blue-500 hover:bg-blue-600 text-white text-lg rounded-lg">Send</button>
-        <button onClick={()=>{ setReplyText("Addressed in class"); onReply(log.id,"Addressed in class"); }}
-          className="p-2 bg-gray-500 hover:bg-gray-600 text-white text-lg rounded-lg whitespace-nowrap">Addressed</button>
+        <button onClick={()=>{ setReplyText("Addressed in class"); onReply(log.id,"Addressed in class"); }} className="p-2 bg-gray-500 hover:bg-gray-600 text-white text-lg rounded-lg whitespace-nowrap">Addressed</button>
       </div>
     );
   };
 
-  const StudentReplyForm = ({ postId, onAddReply }) => {
+  const StudentReplyForm = ({ postId, onAddReply, theme = "dark" }) => {
+    const light = theme === "light";
     const [replyText, setReplyText] = useState('');
     return (
       <div className="mt-2 flex items-center space-x-2">
-        <input type="text" value={replyText} onChange={(e)=>setReplyText(e.target.value)} placeholder="Write an anonymous reply..."
-          className="flex-1 p-2 border bg-slate-600 border-slate-500 rounded-lg text-lg" />
-        <button onClick={()=>{ onAddReply(postId, replyText); setReplyText(''); }}
-          className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-lg">Reply</button>
+        <input
+          type="text"
+          value={replyText}
+          onChange={(e)=>setReplyText(e.target.value)}
+          placeholder="Write an anonymous reply..."
+          className={`flex-1 p-2 border rounded-lg text-lg
+            ${light ? LIGHT_INPUT : "bg-slate-600 border-slate-500 text-white"}`}
+        />
+        <button onClick={()=>{ onAddReply(postId, replyText); setReplyText(''); }} className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-lg">Reply</button>
       </div>
     );
   };
 
   const PostList = React.memo(function PostList({
     posts, type, onAdminLike, onPenalty, onReply, onStudentAddReply,
-    toggleReplies, showReplies, replies, listRef, anonymizeName, getFirstName
+    toggleReplies, showReplies, replies, listRef, anonymizeName, getFirstName,
+    theme = "dark"
   }) {
+    const light = theme === "light";
     return (
-      <ul ref={listRef} className="h-[600px] overflow-y-auto text-xl mt-2">
+      <ul ref={listRef} className={`h-[600px] overflow-y-auto text-xl mt-2 ${light ? "text-black" : ""}`}>
         {posts.map((log) => (
-          <li key={log._path || log.id} className="p-2 border-b border-slate-700">
+          <li key={log._path || log.id} className={`p-2 border-b ${light ? LIGHT_DIVIDER : "border-slate-700"}`}>
             <div className="flex justify-between items-start">
               <span className="flex-1 mr-2">{anonymizeName ? "Anonymous" : getFirstName(log.name)} [{log.type}]: {log.text}</span>
               {type === 'admin' && (
                 <div className="flex items-center space-x-2 flex-shrink-0">
-                  {log.adminLiked ? <span className="text-green-500 font-bold text-lg">✓ Liked</span>
+                  {log.adminLiked ? <span className={`font-bold text-lg ${light ? "text-green-600" : "text-green-500"}`}>✓ Liked</span>
                     : <button onClick={()=>onAdminLike(log.id, log.name)} className="text-3xl">👍</button>}
                   <button onClick={()=>onPenalty(log.name)} className="px-3 py-1 bg-red-600 text-white text-md font-bold rounded hover:bg-red-700">-1</button>
                 </div>
               )}
             </div>
-            {log.reply && <div className="mt-2 p-2 bg-green-900 rounded-lg text-lg"><span className="font-bold">✓ You Replied</span></div>}
-            {type==='admin' && <ReplyForm log={log} onReply={onReply} />}
-            <button onClick={()=>toggleReplies(log.id)} className="text-lg text-blue-400 mt-1">{showReplies[log.id] ? 'Hide Replies' : 'Show Replies'}</button>
+
+            {log.reply && (
+              <div className={`mt-2 p-2 rounded-lg text-lg ${light ? "bg-green-100 text-green-900" : "bg-green-900 text-white"}`}>
+                <span className="font-bold">✓ You Replied</span>
+              </div>
+            )}
+
+            {type==='admin' && <ReplyForm log={log} onReply={onReply} theme={theme} />}
+
+            <button onClick={()=>toggleReplies(log.id)} className={`text-lg mt-1 ${light ? "text-blue-600" : "text-blue-400"}`}>
+              {showReplies[log.id] ? 'Hide Replies' : 'Show Replies'}
+            </button>
+
             {showReplies[log.id] && (
-              <div className="mt-2 pl-4 border-l-2 border-slate-500">
-                <ul className="text-lg mt-2">{replies[log.id]?.map(r => <li key={r.id} className="pt-1 flex justify-between items-center"><span>{anonymizeName ? "Anonymous" : r.author}: {r.text}</span></li>)}</ul>
-                {type!=='admin' && <StudentReplyForm postId={log.id} onAddReply={onStudentAddReply || (()=>{})} />}
+              <div className={`mt-2 pl-4 border-l-2 ${light ? "border-slate-200" : "border-slate-500"}`}>
+                <ul className="text-lg mt-2">
+                  {replies[log.id]?.map(r => (
+                    <li key={r.id} className="pt-1 flex justify-between items-center">
+                      <span>{anonymizeName ? "Anonymous" : r.author}: {r.text}</span>
+                    </li>
+                  ))}
+                </ul>
+                {type!=='admin' && <StudentReplyForm postId={log.id} onAddReply={onStudentAddReply || (()=>{})} theme={theme} />}
               </div>
             )}
           </li>
@@ -934,71 +969,41 @@ const App = () => {
                     className="p-3 border bg-slate-700 border-slate-500 rounded-lg text-white text-2xl"/>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="text-left p-4 border border-slate-600 rounded-xl">
-                    <h3 className="text-3xl font-semibold mb-2">Daily Requirement Progress</h3>
-                    <ul className="space-y-1 text-lg h-40 overflow-y-auto">
-                      {Object.entries(adminDailyProgress).map(([name,progress])=>{
-                        const qcMet = progress.question_comment>=2; const rMet = progress.reasoning>=2;
-                        return (
-                          <li key={name} className="flex justify-between items-center pr-2">
-                            <span>{isAdminAnonymousMode ? "Anonymous" : getFirstName(name)}:</span>
-                            <span>
-                              <span className={qcMet?'text-green-400':'text-red-400'}>{qcMet?'✅':'❌'} {progress.question_comment}/2</span> /
-                              <span className={rMet?'text-green-400':'text-red-400'}>{rMet?'✅':'❌'} {progress.reasoning}/2</span>
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-
-                  <div className="text-left p-4 border border-slate-600 rounded-xl">
-                    <h3 className="text-3xl font-semibold">🚦 Daily Understanding Check</h3>
-                    <ul className="h-40 overflow-y-auto text-lg">
-                      {feedbackLog.map((log)=>(
-                        <li key={log._path || log.id} className="p-2 border-b border-slate-700">
-                          ({safeTime(log.timestamp)}) {isAdminAnonymousMode ? "Anonymous" : getFirstName(log.name)}: {log.status}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                {/* ===== Admin: Q/C & Reasoning → 화이트 테마로 전환 ===== */}
+                <div className={`text-left p-4 ${LIGHT_CARD}`}>
+                  <h3 className="text-3xl font-semibold">❓ Questions & Comments</h3>
+                  <PostList
+                    posts={qcPostsAdmin}
+                    type="admin"
+                    onAdminLike={handleAdminLike}
+                    onPenalty={(n)=>modifyTalent(n,-1,'penalty')}
+                    onReply={handleReply}
+                    toggleReplies={toggleReplies}
+                    showReplies={showReplies}
+                    replies={replies}
+                    listRef={adminListRefQC}
+                    anonymizeName={isAdminAnonymousMode}
+                    getFirstName={getFirstName}
+                    theme="light"
+                  />
                 </div>
 
-                <div className="flex flex-col space-y-6 mt-6">
-                  <div className="text-left p-4 border border-slate-600 rounded-xl">
-                    <h3 className="text-3xl font-semibold">❓ Questions & Comments</h3>
-                    <PostList
-                      posts={reasoningPostsAdmin.length || qcPostsAdmin.length ? qcPostsAdmin : []}
-                      type="admin"
-                      onAdminLike={handleAdminLike}
-                      onPenalty={(n)=>modifyTalent(n,-1,'penalty')}
-                      onReply={handleReply}
-                      toggleReplies={toggleReplies}
-                      showReplies={showReplies}
-                      replies={replies}
-                      listRef={adminListRefQC}
-                      anonymizeName={isAdminAnonymousMode}
-                      getFirstName={getFirstName}
-                    />
-                  </div>
-
-                  <div className="text-left p-4 border border-slate-600 rounded-xl">
-                    <h3 className="text-3xl font-semibold">🤔 Reasoning Posts</h3>
-                    <PostList
-                      posts={reasoningPostsAdmin}
-                      type="admin"
-                      onAdminLike={handleAdminLike}
-                      onPenalty={(n)=>modifyTalent(n,-1,'penalty')}
-                      onReply={handleReply}
-                      toggleReplies={toggleReplies}
-                      showReplies={showReplies}
-                      replies={replies}
-                      listRef={adminListRefReason}
-                      anonymizeName={isAdminAnonymousMode}
-                      getFirstName={getFirstName}
-                    />
-                  </div>
+                <div className={`text-left p-4 mt-6 ${LIGHT_CARD}`}>
+                  <h3 className="text-3xl font-semibold">🤔 Reasoning Posts</h3>
+                  <PostList
+                    posts={reasoningPostsAdmin}
+                    type="admin"
+                    onAdminLike={handleAdminLike}
+                    onPenalty={(n)=>modifyTalent(n,-1,'penalty')}
+                    onReply={handleReply}
+                    toggleReplies={toggleReplies}
+                    showReplies={showReplies}
+                    replies={replies}
+                    listRef={adminListRefReason}
+                    anonymizeName={isAdminAnonymousMode}
+                    getFirstName={getFirstName}
+                    theme="light"
+                  />
                 </div>
               </>
             )}
@@ -1101,79 +1106,39 @@ const App = () => {
                   <span className="font-bold text-2xl align-middle">My Total Talents: {myTotalTalents}</span>
                 </div>
 
-                <div className="text-left p-4 border border-slate-600 rounded-xl mt-2">
-                  <h3 className="text-3xl font-semibold text-gray-100 mb-2">My Talent History</h3>
-                  <ul className="text-lg space-y-1">
-                    {talentTransactions.map((log,i)=>(
-                      <li key={i} className={`p-1 flex justify-between items-center ${log.points>0?'text-green-400':'text-red-400'}`}>
-                        <span><span className="font-bold">{log.points>0?`+${log.points}`:log.points}</span>: {log.type}</span>
-                        <span className="text-base text-gray-500">({safeDate(log.timestamp)})</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
+                {/* ===== Student: Q/C & Reasoning → PostList로 통일 + 화이트 테마 ===== */}
                 {studentSelectedDate && (
-                  <div className="text-left p-4 border border-slate-600 rounded-xl mt-6">
-                    <h3 className="text-3xl font-semibold">Logs for {studentSelectedDate}</h3>
-                    <div className="flex flex-col space-y-6 mt-6">
-                      <div className="text-left">
-                        <h4 className="font-semibold mt-4 text-2xl text-gray-300">❓ Questions & Comments</h4>
-                        <ul className="h-[600px] overflow-y-auto text-lg" ref={studentListRefQC}>
-                          {studentQcPosts.map((log) => (
-                            <li key={log._path || log.id} className="p-2 border-b border-slate-700">
-                              <div>
-                                {log.name === nameInput && log.adminLiked && <span className="mr-2 text-yellow-400 font-bold">👍 by Prof. Ahn (+1 Bonus)</span>}
-                                [{log.type}]: {log.text}
-                              </div>
-                              {log.name === nameInput && log.reply && (
-                                <div className="mt-2 p-2 bg-slate-600 rounded-lg text-lg text-gray-200 flex justify-between items-center">
-                                  <span><b>Prof. Ahn's Reply:</b> {log.reply}</span>
-                                  <button onClick={() => !log.studentLiked && handleStudentLike(log.id)} disabled={log.studentLiked} className="ml-2 text-3xl disabled:opacity-50">{log.studentLiked ? '👍 Liked' : '👍'}</button>
-                                </div>
-                              )}
-                              <button onClick={() => toggleReplies(log.id)} className="text-lg text-blue-400 mt-1">{showReplies[log.id] ? 'Hide Replies' : 'Show Replies'}</button>
-                              {showReplies[log.id] && (
-                                <div className="mt-2 pl-4 border-l-2 border-slate-500">
-                                  <div className="mt-2">
-                                    <StudentReplyForm postId={log.id} onAddReply={handleAddReply} />
-                                  </div>
-                                  <ul className="text-lg mt-2">{replies[log.id]?.map(reply => <li key={reply.id} className="pt-1 flex justify-between items-center"><span>Anonymous: {reply.text}</span></li>)}</ul>
-                                </div>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                  <div className="text-left mt-6 space-y-6">
+                    <div className={`${LIGHT_CARD} p-4`}>
+                      <h4 className="font-semibold mt-1 text-2xl">❓ Questions & Comments</h4>
+                      <PostList
+                        posts={studentQcPosts}
+                        type="student"
+                        onStudentAddReply={handleAddReply}
+                        toggleReplies={toggleReplies}
+                        showReplies={showReplies}
+                        replies={replies}
+                        listRef={studentListRefQC}
+                        anonymizeName={false}
+                        getFirstName={getFirstName}
+                        theme="light"
+                      />
+                    </div>
 
-                      <div className="text-left">
-                        <h4 className="font-semibold mt-4 text-2xl text-gray-300">🤔 Reasoning Posts</h4>
-                        <ul className="h-[600px] overflow-y-auto text-lg" ref={studentListRefReason}>
-                          {studentReasoningPosts.map((log) => (
-                            <li key={log._path || log.id} className="p-2 border-b border-slate-700">
-                              <div>
-                                {log.name === nameInput && log.adminLiked && <span className="mr-2 text-yellow-400 font-bold">👍 by Prof. Ahn (+1 Bonus)</span>}
-                                [{log.type}]: {log.text}
-                              </div>
-                              {log.name === nameInput && log.reply && (
-                                <div className="mt-2 p-2 bg-slate-600 rounded-lg text-lg text-gray-200 flex justify-between items-center">
-                                  <span><b>Prof. Ahn's Reply:</b> {log.reply}</span>
-                                  <button onClick={() => !log.studentLiked && handleStudentLike(log.id)} disabled={log.studentLiked} className="ml-2 text-3xl disabled:opacity-50">{log.studentLiked ? '👍 Liked' : '👍'}</button>
-                                </div>
-                              )}
-                              <button onClick={() => toggleReplies(log.id)} className="text-lg text-blue-400 mt-1">{showReplies[log.id] ? 'Hide Replies' : 'Show Replies'}</button>
-                              {showReplies[log.id] && (
-                                <div className="mt-2 pl-4 border-l-2 border-slate-500">
-                                  <div className="mt-2">
-                                    <StudentReplyForm postId={log.id} onAddReply={handleAddReply} />
-                                  </div>
-                                  <ul className="text-lg mt-2">{replies[log.id]?.map(reply => <li key={reply.id} className="pt-1 flex justify-between items-center"><span>Anonymous: {reply.text}</span></li>)}</ul>
-                                </div>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                    <div className={`${LIGHT_CARD} p-4`}>
+                      <h4 className="font-semibold mt-1 text-2xl">🤔 Reasoning Posts</h4>
+                      <PostList
+                        posts={studentReasoningPosts}
+                        type="student"
+                        onStudentAddReply={handleAddReply}
+                        toggleReplies={toggleReplies}
+                        showReplies={showReplies}
+                        replies={replies}
+                        listRef={studentListRefReason}
+                        anonymizeName={false}
+                        getFirstName={getFirstName}
+                        theme="light"
+                      />
                     </div>
                   </div>
                 )}
