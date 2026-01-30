@@ -27,6 +27,18 @@ const COURSE_STUDENTS = {
   "ADV 461": ["Bonk, Maya","Burrow, Elizabeth","Campos, Victoria","Cantada, Cristian","Chong, Timothy","Chung, Sooa","Cwiertnia, Zachary","Fernandez, Francisco","Fok, Alexis","Gilbert, Jasmine","Hall, Lily","Hosea, Nicholas","Jang, Da Eun","Kim, Lynn","Kim, Noelle","Koning, William","Lee, Edmund","Lewandowski, Luke","Leyson, Noah","Lopez, Tatum","Murphy, Alexander","Swendsen, Katherine"]
 };
 
+const StableImg = React.memo(({ src, alt }) => (
+  <img
+    src={src}
+    alt={alt}
+    width={128}
+    height={96}
+    loading="lazy"
+    className="h-24 sm:h-32 w-auto rounded-lg shadow-lg"
+    style={{ aspectRatio: '4 / 3' }}
+  />
+));
+
 /* =========================
    Env helpers
    ========================= */
@@ -1173,23 +1185,28 @@ const App = () => {
     />
   );
 
-  const PhotoGallery = ({ handleFeedback, handleVerbalParticipation, handleStudentLike }) => (
-    <>
-      <div className="flex justify-center items-center gap-2 sm:gap-4 flex-wrap">
-        {[...Array(7)].map((_,i)=><StableImg key={i} src={`/photo${i+1}.jpg`} alt={`Gallery ${i+1}`} />)}
+const PhotoGallery = React.memo(({ children }) => (
+  <div className="flex flex-col min-h-screen">
+    {/* TOP ROW */}
+    <div key="top-gallery" className="flex justify-center items-center gap-2 sm:gap-4 flex-wrap h-24 sm:h-32 overflow-hidden shrink-0">
+      {[...Array(7)].map((_, i) => (
+        <StableImg key={`top-${i}`} src={`/photo${i + 1}.jpg`} alt={`Gallery ${i + 1}`} />
+      ))}
       </div>
-      <div className="flex justify-center items-center flex-grow my-4">
-        <MainContent
-          handleFeedback={handleFeedback}
-          handleVerbalParticipation={handleVerbalParticipation}
-          handleStudentLike={handleStudentLike}
-        />
+
+    {/* MAIN CONTENT AREA */}
+    <div className="flex-grow flex justify-center items-start my-4">
+      {children}
       </div>
-      <div className="flex justify-center items-center gap-2 sm:gap-4 flex-wrap">
-        {[...Array(7)].map((_,i)=><StableImg key={i} src={`/photo${i+8}.jpg`} alt={`Gallery ${i+8}`} />)}
+
+    {/* BOTTOM ROW */}
+    <div key="bottom-gallery" className="flex justify-center items-center gap-2 sm:gap-4 flex-wrap h-24 sm:h-32 overflow-hidden shrink-0">
+      {[...Array(7)].map((_, i) => (
+        <StableImg key={`bottom-${i}`} src={`/photo${i + 8}.jpg`} alt={`Gallery ${i + 8}`} />
+      ))}
       </div>
-    </>
-  );
+  </div>
+));
 
   /* ===== Handlers BEFORE PhotoGallery usage ===== */
   const handleFeedback = useCallback(async (status) => {
@@ -1230,12 +1247,15 @@ const App = () => {
   }, [db, resolvedAppId]);
 
   return (
-    <div className="min-h-screen w-full bg-custom-beige-bg flex flex-col justify-between p-2 sm:p-4">
-      <PhotoGallery
+  <div className="min-h-screen w-full bg-custom-beige-bg p-2 sm:p-4">
+    <PhotoGallery>
+      <MainContent
         handleFeedback={handleFeedback}
         handleVerbalParticipation={handleVerbalParticipation}
         handleStudentLike={handleStudentLike}
       />
+    </PhotoGallery>
+
       {showMessageBox && (
         <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-900 text-white p-6 rounded-xl text-center z-50 text-2xl">
           {message}
